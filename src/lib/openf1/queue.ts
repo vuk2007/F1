@@ -8,6 +8,10 @@
  * Requests run strictly one at a time. That is slower than a parallel fan-out but
  * it is the only way to stay predictably inside a 3 req/s budget, and a full
  * session download is cached afterwards so the cost is paid once.
+ *
+ * The budget is tracked per instance. One browser tab uses one shared queue, so
+ * that is the whole client; but several processes sharing an IP each keep their
+ * own window and can collectively breach the limit.
  */
 
 export interface RateLimitConfig {
@@ -54,8 +58,7 @@ export class RateLimitedQueue {
       } catch (error) {
         attempt += 1;
         if (attempt > this.config.maxRetries || !isRetryable(error)) throw error;
-        // Exponential backoff: 1s, 2s, 4s, 8s.
-        await sleep(1000 * 2 ** (attempt - 1));
+        await sleep(backoffMs(error, attempt));
       }
     }
   }
@@ -81,6 +84,22 @@ export class RateLimitedQueue {
       await sleep(waitMs + 20); // small cushion for clock jitter
     }
   }
+}
+
+/**
+ * How long to wait before retrying.
+ *
+ * A 429 means a sliding window is already full, and the minute window only
+ * clears after a minute — retrying in a second just burns another request. So
+ * rate limiting backs off far harder than a transient server error does.
+ */
+function backoffMs(error: unknown, attempt: number): number {
+  if (error instanceof HttpError && error.status === 429) {
+    // 5s, 15s, 30s, 60s.
+    return [5_000, 15_000, 30_000, 60_000][attempt - 1] ?? 60_000;
+  }
+  // 1s, 2s, 4s, 8s for server errors and dropped connections.
+  return 1000 * 2 ** (attempt - 1);
 }
 
 /** HTTP error carrying the status code, so callers can branch on it. */

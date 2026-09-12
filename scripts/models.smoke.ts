@@ -13,7 +13,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { SessionDataset } from '@/lib/openf1/dataset';
-import { loadSession } from '@/lib/openf1/loader';
+import { loadSessionForSmoke } from './load-or-skip';
 import { cautionPeriods } from '@/lib/models/caution';
 import { estimatePitLoss } from '@/lib/models/pit-loss';
 import { pitWindow } from '@/lib/models/pit-window';
@@ -36,7 +36,7 @@ let dataset: SessionDataset;
 let analyses: StintAnalysis[];
 
 beforeAll(async () => {
-  dataset = await loadSession(MONZA_2025_RACE);
+  dataset = await loadSessionForSmoke(MONZA_2025_RACE);
   const periods = cautionPeriods(dataset.raceControl);
   analyses = dataset.stints.map((stint) =>
     analyseStint(dataset, stint.driver_number, stint, { periods }),

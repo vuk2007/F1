@@ -214,6 +214,32 @@ export const strings = {
     estimate: 'Reduction factors are rules of thumb, not measurements.',
   },
 
+  practice: {
+    heading: 'Session analysis',
+    theoretical: 'Theoretical best',
+    actualBest: 'Best lap',
+    timeLeft: 'Time left on the table',
+    perfectLap: 'Best lap already used every best sector',
+    sectors: 'Best sectors',
+    fromLap: (n: number) => `lap ${n}`,
+    runs: 'Runs',
+    runKinds: {
+      short: 'Qualifying sim',
+      long: 'Race sim',
+      installation: 'No timed laps',
+    } as Record<string, string>,
+    laps: 'laps',
+    best: 'Best',
+    average: 'Avg',
+    spread: 'Spread',
+    noRuns: 'No runs recorded for this driver.',
+    longRunSummary: 'Long-run pace',
+    shortRunSummary: 'One-lap pace',
+    noLongRun: 'No race simulation in this session.',
+    noShortRun: 'No qualifying simulation in this session.',
+    leaderboard: 'Theoretical best by driver',
+  },
+
   common: {
     noValue: '—',
     laps: 'laps',

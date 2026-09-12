@@ -40,7 +40,38 @@ export interface AnalyseOptions {
   periods?: CautionPeriod[];
   /** Overrides the per-session-type default. */
   fuelEffectPerLap?: number;
+  /** Overrides the representative lap-time ceiling. */
+  maxLapTime?: number;
 }
+
+/**
+ * The slowest lap time still counted as representative, or null in a race.
+ *
+ * Races are continuous: even a slow lap is a real racing lap and is filtered by
+ * the pit and caution rules instead. Practice and qualifying are not — a stint
+ * there routinely contains several hundred seconds of garage time and 130s
+ * cool-down laps, which would otherwise be fitted as if they were pace.
+ *
+ * The ceiling is measured against the session's best lap, matching F1's own
+ * 107% rule, rather than against the driver's own best, which breaks down for a
+ * driver who never set a representative time.
+ */
+export function representativeLimit(
+  dataset: SessionDataset,
+  threshold = REPRESENTATIVE_THRESHOLD,
+): number | null {
+  if (dataset.session.session_type === 'Race') return null;
+
+  let best: number | null = null;
+  for (const lap of dataset.laps) {
+    if (lap.lap_duration == null || lap.lap_duration <= 0) continue;
+    if (best == null || lap.lap_duration < best) best = lap.lap_duration;
+  }
+  return best == null ? null : best * threshold;
+}
+
+/** F1's qualifying yardstick, reused as "was this lap a real effort". */
+export const REPRESENTATIVE_THRESHOLD = 1.07;
 
 export function analyseStint(
   dataset: SessionDataset,
@@ -52,7 +83,9 @@ export function analyseStint(
   const fuelEffectPerLap =
     options.fuelEffectPerLap ?? defaultFuelEffect(dataset.session.session_type);
 
-  let samples = collectStintLaps(dataset, driverNumber, stint, { periods });
+  const maxLapTime = options.maxLapTime ?? representativeLimit(dataset) ?? undefined;
+
+  let samples = collectStintLaps(dataset, driverNumber, stint, { periods, maxLapTime });
   let degradation = tyreDegradation(samples, { fuelEffectPerLap });
   let relaxedTrafficFilter = false;
 
@@ -60,6 +93,7 @@ export function analyseStint(
     const relaxed = collectStintLaps(dataset, driverNumber, stint, {
       periods,
       excludeTraffic: false,
+      maxLapTime,
     });
     const relaxedFit = tyreDegradation(relaxed, { fuelEffectPerLap });
     // Only accept the fallback if it actually gives us more to work with.

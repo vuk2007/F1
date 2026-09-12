@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { buildQueryString } from './client';
+import { afterEach, describe, expect, it } from 'vitest';
+import { buildQueryString, getIntervals } from './client';
 
 describe('buildQueryString', () => {
   it('encodes ordinary parameters', () => {
@@ -60,4 +60,40 @@ describe('buildQueryString', () => {
   it('returns an empty string for an empty query', () => {
     expect(buildQueryString({})).toBe('');
   });
+});
+
+describe('empty result handling', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function stubFetch(status: number, body: string) {
+    globalThis.fetch = (async () =>
+      new Response(body, {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+  }
+
+  it('treats a 404 "No results found" as an empty list', async () => {
+    /*
+     * Verified against the live API: intervals for a practice session returns
+     * 404 with this body, because practice has no running order. Treating that
+     * as an error stopped every practice session from loading at all.
+     */
+    stubFetch(404, '{"detail":"No results found."}');
+    await expect(getIntervals(9906)).resolves.toEqual([]);
+  });
+
+  it('still raises other 404s', async () => {
+    stubFetch(404, '{"detail":"Unknown endpoint"}');
+    await expect(getIntervals(1)).rejects.toThrow(/404/);
+  });
+
+  it('raises a genuine server error', async () => {
+    stubFetch(500, 'upstream exploded');
+    await expect(getIntervals(2)).rejects.toThrow();
+  }, 60_000);
 });

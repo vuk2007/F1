@@ -15,10 +15,13 @@ import { StrategyPanel } from '@/components/StrategyPanel';
 import { TimingTable } from '@/components/TimingTable';
 import { WeatherStrip } from '@/components/WeatherStrip';
 import { strings } from '@/lib/i18n/strings';
+import { PracticePanel } from '@/components/PracticePanel';
 import { SafetyCarPanel } from '@/components/SafetyCarPanel';
 import { TelemetryPanel } from '@/components/TelemetryPanel';
 import { UndercutPanel, type UndercutScenario } from '@/components/UndercutPanel';
+import { theoreticalBestLap, theoreticalBestByDriver } from '@/lib/models/best-lap';
 import { estimatePitLoss } from '@/lib/models/pit-loss';
+import { classifyRuns } from '@/lib/models/runs';
 import { pitWindow } from '@/lib/models/pit-window';
 import { safetyCarOpportunity } from '@/lib/models/safety-car';
 import {
@@ -133,11 +136,33 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
   }, [dataset, models, selectedDriver]);
 
   /*
+   * Practice and qualifying analysis. Independent of the replay clock: a run is
+   * a property of the whole session, not of a moment in it.
+   */
+  const practice = useMemo(() => {
+    if (!dataset || !models || models.isRace || !driverAnalysis) return null;
+    const driverNumbers = dataset.drivers.map((d) => d.driver_number);
+    const ranked = theoreticalBestByDriver(dataset.laps, driverNumbers);
+
+    return {
+      best: theoreticalBestLap(
+        dataset.laps.filter((lap) => lap.driver_number === driverAnalysis.driver.driver_number),
+      ),
+      runs: classifyRuns(dataset, driverAnalysis.driver.driver_number),
+      leaderboard: ranked.flatMap((entry) => {
+        const driver = dataset.drivers.find((d) => d.driver_number === entry.driverNumber);
+        return driver ? [{ driver, best: entry.best }] : [];
+      }),
+    };
+  }, [dataset, models, driverAnalysis]);
+
+  /*
    * The strategy read follows the clock. Each piece is arithmetic over a handful
    * of laps, so recomputing per frame is cheap now that the fits are cached.
    */
   const strategy = useMemo(() => {
-    if (!dataset || !models || !driverAnalysis || !view) return null;
+    // Pit windows and undercuts only mean something when drivers are racing.
+    if (!dataset || !models || !models.isRace || !driverAnalysis || !view) return null;
     const me = driverAnalysis.driver.driver_number;
     const lap = currentLapNumber(dataset, me, timeMs);
     if (lap == null) return null;
@@ -332,19 +357,29 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
 
           {driverAnalysis ? (
             <>
-              {strategy ? (
-                <StrategyPanel
-                  window={strategy.window}
-                  pitLoss={driverAnalysis.pitLoss}
-                  undercut={<UndercutPanel ahead={strategy.ahead} behind={strategy.behind} />}
-                  safetyCar={<SafetyCarPanel opportunity={strategy.caution} />}
+              {practice && (
+                <PracticePanel
+                  driver={driverAnalysis.driver}
+                  best={practice.best}
+                  runs={practice.runs}
+                  leaderboard={practice.leaderboard}
                 />
-              ) : (
-                /* Before the driver's first lap there is no tyre age to reason from. */
-                <p className="border-border text-muted border-t px-4 py-4 text-xs">
-                  {strings.strategy.notStarted}
-                </p>
               )}
+
+              {models?.isRace &&
+                (strategy ? (
+                  <StrategyPanel
+                    window={strategy.window}
+                    pitLoss={driverAnalysis.pitLoss}
+                    undercut={<UndercutPanel ahead={strategy.ahead} behind={strategy.behind} />}
+                    safetyCar={<SafetyCarPanel opportunity={strategy.caution} />}
+                  />
+                ) : (
+                  /* Before the driver's first lap there is no tyre age to reason from. */
+                  <p className="border-border text-muted border-t px-4 py-4 text-xs">
+                    {strings.strategy.notStarted}
+                  </p>
+                ))}
               <DriverPanel driver={driverAnalysis.driver} analyses={driverAnalysis.analyses} />
               <TelemetryPanel dataset={dataset} driver={driverAnalysis.driver} />
             </>

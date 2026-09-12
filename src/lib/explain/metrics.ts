@@ -202,6 +202,34 @@ export const METRICS = {
     reading:
       'The field slows but the pit lane limit does not, so the stop costs roughly half its normal price. The drivers who gain most are those for whom a stop was not previously worth making and now is. The reduction factors are rules of thumb, not measurements from this session.',
   },
+  theoreticalBest: {
+    title: 'Theoretical best lap',
+    what: 'The driver’s best first sector plus best second plus best third, whichever laps they came from.',
+    why: 'It separates what the car is capable of from what the driver actually strung together.',
+    reading:
+      'The gap to their real best lap is time left on the table — a driver several tenths adrift has the pace but has not put a lap together. A gap of zero means they nailed it.',
+  },
+  runKind: {
+    title: 'Run type',
+    what: 'Whether a run was a one-lap qualifying simulation or a longer race simulation.',
+    why: 'The two answer different questions and cannot be compared with each other.',
+    reading:
+      'Short runs happen on fresh softs with low fuel and show ultimate pace. Long runs carry fuel and show tyre behaviour. A team quick on Friday short runs but poor on long runs usually struggles on Sunday.',
+  },
+  runConsistency: {
+    title: 'Spread',
+    what: 'How much the lap times varied across a run, in seconds.',
+    why: 'A consistent long run means the tyre is stable and the driver is comfortable.',
+    reading:
+      'Under about two tenths is a clean, repeatable run. A large spread means traffic, mistakes, or a tyre that is moving around — and it makes any degradation figure from that run much weaker.',
+  },
+  longRunPace: {
+    title: 'Long-run pace',
+    what: 'Average lap time across the representative laps of a race simulation.',
+    why: 'It is the best Friday predictor of Sunday race pace.',
+    reading:
+      'Compare it only against runs on the same compound with similar fuel. Laps outside 107% of the session best — in-laps, cool-down laps, garage time — are excluded, so the average reflects real running.',
+  },
 } as const satisfies Record<string, MetricExplanation>;
 
 export type MetricKey = keyof typeof METRICS;

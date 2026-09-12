@@ -10,7 +10,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { SessionDataset } from '@/lib/openf1/dataset';
-import { loadSession } from '@/lib/openf1/loader';
+import { loadSessionForSmoke } from './load-or-skip';
 import {
   driverStateAt,
   leaderLapAt,
@@ -25,7 +25,7 @@ const MONZA_2025_RACE = 9912;
 let dataset: SessionDataset;
 
 beforeAll(async () => {
-  dataset = await loadSession(MONZA_2025_RACE);
+  dataset = await loadSessionForSmoke(MONZA_2025_RACE);
 }, 180_000);
 
 describe('Monza 2025 race download', () => {

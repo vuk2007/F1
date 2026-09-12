@@ -58,7 +58,12 @@ one driver over one lap, using `date>=` / `date<=`.
 
 While a live F1 session is running, OpenF1 returns `401` to **all** unauthenticated requests,
 including historical data, until the session ends. The app detects this and shows a specific
-message rather than a generic error.
+message rather than a generic error, and `pnpm smoke` fails with an explicit
+`SmokeUnavailableError` saying the outage is upstream. The offline suite (`pnpm test`) covers
+the same models and always runs.
+
+`pnpm smoke` also runs its files one at a time: the rate-limited queue is per module instance,
+so parallel Vitest workers would each claim the full 3 req/s budget and collectively earn a 429.
 
 ## Verified API details
 
@@ -103,6 +108,14 @@ data, not chosen on theory:
 - **Telemetry is plotted against distance, integrated from speed.** Accurate to about 1%
   (5731m measured against Monza's real 5793m), which is fine for lining two laps up but is
   an estimate, not a track position.
+- **Outside a race, laps slower than 107% of the session best are discarded.** A practice
+  stint routinely contains several hundred seconds of garage time and 130s cool-down laps;
+  fitting those produced a "degradation" of -11.5 s/lap. The threshold is measured against
+  the session best (as F1's own 107% rule is), not the driver's own, so a driver who never
+  set a representative lap does not become their own benchmark.
+- **A slope graded unusable is never displayed as a number.** `usableSlope()` returns null and
+  the UI shows "not enough clean laps" instead — the raw value stays available for debugging
+  but cannot be misread as a finding.
 
 ## Status
 
@@ -113,4 +126,17 @@ data, not chosen on theory:
 - **Phase 3 — done.** Per-lap telemetry with a second-driver overlay and time delta,
   undercut/overcut simulation against the cars ahead and behind, safety car opportunity,
   and an (i) explanation on every metric.
-- Phase 4 — practice/qualifying mode, polish, Vercel deploy.
+- **Phase 4 — done.** Practice/qualifying mode with long-run vs short-run classification and
+  theoretical best lap, plus deploy configuration.
+
+## Deploying
+
+`vercel.json` pins the framework, pnpm commands and a few security headers; `package.json`
+declares Node >= 20.9. Import the repository on Vercel and it builds with no further setup —
+there are no environment variables and no server-side secrets, because the browser talks to
+OpenF1 directly.
+
+If OpenF1 ever blocks browser origins or the shared rate limit becomes a problem, the fix is a
+thin Next.js route handler proxying `/api/openf1/*` with a cache; nothing outside
+`lib/openf1/client.ts` would need to change. That is not needed today — CORS works and the
+per-tab queue stays inside the limit.

@@ -68,6 +68,12 @@ export interface CollectOptions {
   periods?: CautionPeriod[];
   /** Set false to keep traffic laps (useful when a stint has too few clean laps). */
   excludeTraffic?: boolean;
+  /**
+   * Laps slower than this are marked as outliers. Used outside races to strip
+   * garage time, in-laps and aborted efforts, which in practice can be several
+   * hundred seconds long.
+   */
+  maxLapTime?: number;
 }
 
 /**
@@ -79,6 +85,7 @@ export interface CollectOptions {
  *  - pit-in  : a lap the driver entered the pits on, per the pit feed (~4s slow)
  *  - standing-start : lap 1, a standing start or an out-lap
  *  - caution : the lap overlapped a safety car, VSC or red flag period
+ *  - outlier : slower than `maxLapTime`, i.e. garage time or a cool-down lap
  *  - traffic : median gap to the car ahead was under 1.0s
  */
 export function collectStintLaps(
@@ -130,6 +137,8 @@ export function collectStintLaps(
       overlapsCaution(periods, startMs, startMs + lap.lap_duration * 1000)
     ) {
       excluded = 'caution';
+    } else if (options.maxLapTime != null && lap.lap_duration > options.maxLapTime) {
+      excluded = 'outlier';
     } else if (excludeTraffic && startMs != null) {
       const gap = medianIntervalDuringLap(intervals, startMs, startMs + lap.lap_duration * 1000);
       if (gap != null && gap < TRAFFIC_THRESHOLD_SECONDS) excluded = 'traffic';

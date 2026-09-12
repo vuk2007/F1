@@ -118,6 +118,16 @@ async function request<T>(
       if (response.status === 401 && body.includes('Live F1 session in progress')) {
         throw new LiveSessionLockoutError(parseDetail(body));
       }
+      /*
+       * OpenF1 reports an empty result set as 404 rather than an empty array.
+       * This is not an error condition: `intervals` legitimately has no rows for
+       * a practice session, because there is no running order to measure gaps
+       * against. Treating it as a failure made every practice and qualifying
+       * session refuse to load.
+       */
+      if (response.status === 404 && body.includes('No results found')) {
+        return [] as T[];
+      }
       throw new HttpError(response.status, url, body.slice(0, 300));
     }
     return (await response.json()) as T[];

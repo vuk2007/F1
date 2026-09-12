@@ -7,6 +7,7 @@ import {
   analyseStint,
   currentPace,
   currentPaceBase,
+  representativeLimit,
   stintAnalysisForLap,
 } from './stint-analysis';
 import { defaultFuelEffect, TYPICAL_FUEL_EFFECT_PER_LAP } from './tyre-degradation';
@@ -171,6 +172,64 @@ describe('analyseStint', () => {
     expect(result.slope).toBeNull();
     // The raw number is still there for display and debugging.
     expect(result.degradation.slope).not.toBeNull();
+  });
+});
+
+describe('representativeLimit', () => {
+  it('is off during a race, where even a slow lap is a real racing lap', () => {
+    expect(representativeLimit(dataset({}))).toBeNull();
+  });
+
+  it('is 107% of the session best outside a race', () => {
+    // The fixture's quickest lap is 90.05.
+    const limit = representativeLimit(dataset({ sessionType: 'Practice' }))!;
+    expect(limit).toBeCloseTo(90.05 * 1.07, 4);
+  });
+
+  it('accepts a tighter threshold', () => {
+    const limit = representativeLimit(dataset({ sessionType: 'Qualifying' }), 1.02)!;
+    expect(limit).toBeCloseTo(90.05 * 1.02, 4);
+  });
+});
+
+describe('practice filtering', () => {
+  /** Ten racing laps plus a 400-second spell in the garage and a cool-down lap. */
+  function practiceLaps(): Lap[] {
+    const laps = degradingLaps.slice();
+    laps.push(lap(11, 400));
+    laps.push(lap(12, 150));
+    return laps;
+  }
+  const longStint: Stint = { ...stint, lap_end: 12 };
+
+  it('strips garage time and cool-down laps outside a race', () => {
+    const data = dataset({
+      laps: practiceLaps(),
+      stints: [longStint],
+      sessionType: 'Practice',
+    });
+    const result = analyseStint(data, DRIVER, longStint);
+
+    // Lap 1 is the out lap; the 400s and 150s laps are both outliers.
+    expect(result.degradation.cleanLaps).toBe(9);
+    const outliers = result.samples.filter((s) => s.excluded === 'outlier');
+    expect(outliers.map((s) => s.lapNumber)).toEqual([11, 12]);
+  });
+
+  it('keeps the slope sane once the garage laps are gone', () => {
+    const data = dataset({
+      laps: practiceLaps(),
+      stints: [longStint],
+      sessionType: 'Practice',
+    });
+    // Without the ceiling a 400s lap drags the fit to something absurd.
+    expect(analyseStint(data, DRIVER, longStint).slope).toBeCloseTo(0.05, 4);
+  });
+
+  it('does not strip slow laps during a race', () => {
+    const data = dataset({ laps: practiceLaps(), stints: [longStint], sessionType: 'Race' });
+    const result = analyseStint(data, DRIVER, longStint);
+    expect(result.samples.filter((s) => s.excluded === 'outlier').length).toBeLessThanOrEqual(1);
   });
 });
 

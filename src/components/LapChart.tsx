@@ -66,10 +66,15 @@ function buildRows(analyses: StintAnalysis[]): ChartRow[] {
       if (sample.lapTime == null) continue;
       const reason = sample.excluded ?? (outliers.has(sample.lapNumber) ? 'outlier' : null);
 
+      /*
+       * Only draw a line the model is willing to stand behind. analysis.slope is
+       * null when the fit is graded unusable, and drawing it anyway put a steep
+       * bogus trend through a practice stint made of two in-laps.
+       */
       const fitted =
-        degradation.slope != null && degradation.intercept != null
+        analysis.slope != null && degradation.intercept != null
           ? degradation.intercept +
-            degradation.slope * sample.tyreAge -
+            analysis.slope * sample.tyreAge -
             // Undo the fuel correction so the line sits on the measured laps.
             degradation.fuelEffectPerLap * sample.tyreAge
           : undefined;
@@ -152,9 +157,7 @@ export function LapChart({ analyses }: { analyses: StintAnalysis[] }) {
   }
 
   const domain = yDomain(rows);
-  const fitKeys = analyses
-    .filter((a) => a.degradation.slope != null)
-    .map((a) => `fit${a.stint.stint_number}`);
+  const fitKeys = analyses.filter((a) => a.slope != null).map((a) => `fit${a.stint.stint_number}`);
 
   return (
     <div className="h-72 w-full">

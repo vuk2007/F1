@@ -44,13 +44,19 @@ function StintRow({ analysis }: { analysis: StintAnalysis }) {
       </span>
 
       <span className="tnum text-xs">
-        {degradation.slope == null ? (
+        {/*
+          Shows analysis.slope, not degradation.slope. A fit graded unusable still
+          carries a raw number — one practice stint fitted -11.554 s/lap from two
+          in-laps — and printing it invites exactly the misreading the confidence
+          grade exists to prevent.
+        */}
+        {analysis.slope == null ? (
           <span className="text-muted">{strings.driver.noFit}</span>
         ) : (
           <>
             <span className="text-muted">Deg </span>
-            {degradation.slope >= 0 ? '+' : ''}
-            {degradation.slope.toFixed(3)} {strings.driver.perLap}
+            {analysis.slope >= 0 ? '+' : ''}
+            {analysis.slope.toFixed(3)} {strings.driver.perLap}
           </>
         )}
       </span>
