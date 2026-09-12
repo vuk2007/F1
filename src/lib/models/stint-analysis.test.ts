@@ -108,9 +108,10 @@ describe('analyseStint', () => {
     const intervals = degradingLaps.map((l) => interval(l.lap_number, 0));
     const result = analyseStint(dataset({ intervals }), DRIVER, stint);
 
-    expect(result.degradation.cleanLaps).toBe(10);
+    // Nine of ten: lap 1 is still excluded as a standing start.
+    expect(result.degradation.cleanLaps).toBe(9);
     expect(result.relaxedTrafficFilter).toBe(false);
-    expect(result.samples.every((s) => s.excluded === null)).toBe(true);
+    expect(result.samples.filter((s) => s.excluded === 'traffic')).toHaveLength(0);
   });
 
   it('still excludes genuine dirty air while enough clean laps remain', () => {
@@ -118,8 +119,9 @@ describe('analyseStint', () => {
     const result = analyseStint(dataset({ intervals }), DRIVER, stint);
 
     expect(result.relaxedTrafficFilter).toBe(false);
+    // Lap 1 is excluded as a standing start, so only 2 and 3 count as traffic.
     expect(result.samples.filter((s) => s.excluded === 'traffic').map((s) => s.lapNumber)).toEqual([
-      1, 2, 3,
+      2, 3,
     ]);
     expect(result.degradation.cleanLaps).toBe(7);
   });
@@ -131,7 +133,7 @@ describe('analyseStint', () => {
     // Strict filtering would leave nothing at all, so the filter is relaxed and
     // the caller is told, because the resulting slope overstates degradation.
     expect(result.relaxedTrafficFilter).toBe(true);
-    expect(result.degradation.cleanLaps).toBe(10);
+    expect(result.degradation.cleanLaps).toBe(9);
   });
 
   it('relaxes the traffic filter rather than reporting nothing', () => {
@@ -142,7 +144,7 @@ describe('analyseStint', () => {
     const result = analyseStint(dataset({ intervals }), DRIVER, stint);
 
     expect(result.relaxedTrafficFilter).toBe(true);
-    expect(result.degradation.cleanLaps).toBe(10);
+    expect(result.degradation.cleanLaps).toBe(9);
     expect(result.slope).toBeCloseTo(0.105, 6);
   });
 

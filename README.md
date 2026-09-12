@@ -70,10 +70,30 @@ These were confirmed against the 2025 Italian GP (`session_key=9912`), not assum
   race), so gaps are `number | string | null` and are narrowed once in `parseGap`.
 - `laps.i1_speed` / `st_speed`, and most `race_control` fields, can be `null`.
 
+## Modelling notes
+
+These are the non-obvious decisions behind the strategy numbers. Each was forced by real
+data, not chosen on theory:
+
+- **Race degradation is corrected for fuel burn (~0.055 s/lap).** Uncorrected, every single
+  driver at Monza 2025 fits a *negative* slope — tyres apparently getting faster. Fuel burn
+  outweighs the degradation at a low-wear circuit, so the raw slope has the wrong sign.
+  Practice and qualifying are left uncorrected. A consequence worth knowing: the fitted line
+  on the lap chart often slopes gently downward while the quoted degradation is positive.
+- **A slope is never shown without its clean-lap count and confidence.** Fits with more than
+  1.5s of residual scatter are graded unusable and `usableSlope()` returns null, so they can
+  never reach a strategy call.
+- **Laps excluded from a fit:** pit in-laps and out-laps, laps under a safety car / VSC /
+  red flag, laps spent within 1.0s of the car ahead (median, not minimum), and lap 1 — a
+  standing start is never a representative flying lap. If that leaves too few laps, the
+  traffic filter is relaxed and the UI says so.
+- **Pit loss is total pit-lane time, not stationary time.** See the verified API notes above.
+
 ## Status
 
 - **Phase 1 — done.** Scaffold, OpenF1 client, session picker, full session download,
   live timing table, replay clock.
-- Phase 2 — driver panel, degradation model, pit window.
+- **Phase 2 — done.** Driver panel with lap chart and fitted degradation curves,
+  degradation model, pit window.
 - Phase 3 — telemetry, undercut simulation, safety car opportunity, full explanations.
 - Phase 4 — practice/qualifying mode, polish, Vercel deploy.

@@ -12,7 +12,8 @@ import type { Interval, Lap, Stint } from '@/lib/openf1/types';
 import { tyreAgeOnLap } from '@/lib/replay/selectors';
 import { cautionPeriods, overlapsCaution, type CautionPeriod } from './caution';
 
-export type ExclusionReason = 'no-time' | 'pit-in' | 'pit-out' | 'caution' | 'traffic' | 'outlier';
+export type ExclusionReason =
+  'no-time' | 'pit-in' | 'pit-out' | 'caution' | 'traffic' | 'outlier' | 'standing-start';
 
 export interface StintLapSample {
   lapNumber: number;
@@ -76,6 +77,7 @@ export interface CollectOptions {
  *  - no-time : the API has no lap_duration
  *  - pit-out : `is_pit_out_lap`, the lap containing the stop itself (~20s slow)
  *  - pit-in  : a lap the driver entered the pits on, per the pit feed (~4s slow)
+ *  - standing-start : lap 1, a standing start or an out-lap
  *  - caution : the lap overlapped a safety car, VSC or red flag period
  *  - traffic : median gap to the car ahead was under 1.0s
  */
@@ -113,6 +115,16 @@ export function collectStintLaps(
       excluded = 'pit-out';
     } else if (pitInLaps.has(lap.lap_number)) {
       excluded = 'pit-in';
+    } else if (lap.lap_number === 1) {
+      /*
+       * Lap 1 is never a representative flying lap: in a race it contains a
+       * standing start and the first-corner scramble, and in practice or
+       * qualifying it is an out-lap. It sits systematically off the trend, so it
+       * is excluded by rule rather than left to the outlier pass, which only
+       * engages once a stint is long enough. The pit reasons above are more
+       * specific, so they win when both apply.
+       */
+      excluded = 'standing-start';
     } else if (
       startMs != null &&
       overlapsCaution(periods, startMs, startMs + lap.lap_duration * 1000)

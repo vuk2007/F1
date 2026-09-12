@@ -8,19 +8,26 @@
  */
 import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
+import { DriverPanel } from '@/components/DriverPanel';
 import { RaceControlFeed } from '@/components/RaceControlFeed';
 import { ReplayControls } from '@/components/ReplayControls';
+import { StrategyPanel } from '@/components/StrategyPanel';
 import { TimingTable } from '@/components/TimingTable';
 import { WeatherStrip } from '@/components/WeatherStrip';
 import { strings } from '@/lib/i18n/strings';
+import { estimatePitLoss } from '@/lib/models/pit-loss';
+import { pitWindow } from '@/lib/models/pit-window';
+import { analyseDriverStints, stintAnalysisForLap } from '@/lib/models/stint-analysis';
 import { LiveSessionLockoutError } from '@/lib/openf1/client';
 import { loadSession } from '@/lib/openf1/loader';
 import { useReplayClock } from '@/lib/replay/use-replay-clock';
 import {
+  currentLapNumber,
   leaderLapAt,
   raceControlFeed,
   timingTableAt,
   trackStatusAt,
+  tyreAgeOnLap,
   weatherAt,
 } from '@/lib/replay/selectors';
 import { useSessionStore } from '@/lib/store/session-store';
@@ -81,6 +88,42 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
       messages: raceControlFeed(dataset, timeMs),
     };
   }, [dataset, timeMs]);
+
+  /*
+   * Fitting every stint means a regression per stint, so this is keyed on the
+   * driver and dataset only — never on the clock. Recomputing it per frame
+   * would refit the whole race sixty times a second.
+   */
+  const driverAnalysis = useMemo(() => {
+    if (!dataset || selectedDriver == null) return null;
+    const driver = dataset.drivers.find((d) => d.driver_number === selectedDriver);
+    if (!driver) return null;
+    return {
+      driver,
+      analyses: analyseDriverStints(dataset, selectedDriver),
+      pitLoss: estimatePitLoss(dataset),
+      // A completed session's highest lap number is its race distance.
+      totalLaps: dataset.laps.reduce((max, lap) => Math.max(max, lap.lap_number), 0),
+    };
+  }, [dataset, selectedDriver]);
+
+  /* Cheap by comparison, so this one does follow the clock. */
+  const strategy = useMemo(() => {
+    if (!dataset || !driverAnalysis) return null;
+    const lap = currentLapNumber(dataset, driverAnalysis.driver.driver_number, timeMs);
+    if (lap == null) return null;
+
+    const current = stintAnalysisForLap(driverAnalysis.analyses, lap);
+    if (!current) return null;
+
+    return pitWindow({
+      currentLap: lap,
+      totalLaps: driverAnalysis.totalLaps,
+      tyreAge: tyreAgeOnLap(current.stint, lap),
+      slope: current.slope,
+      pitLoss: driverAnalysis.pitLoss.seconds,
+    });
+  }, [dataset, driverAnalysis, timeMs]);
 
   if (status === 'error') {
     return (
@@ -149,6 +192,24 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
             selectedDriver={selectedDriver}
             onSelectDriver={selectDriver}
           />
+
+          {driverAnalysis ? (
+            <>
+              {strategy ? (
+                <StrategyPanel window={strategy} pitLoss={driverAnalysis.pitLoss} />
+              ) : (
+                /* Before the driver's first lap there is no tyre age to reason from. */
+                <p className="border-border text-muted border-t px-4 py-4 text-xs">
+                  {strings.strategy.notStarted}
+                </p>
+              )}
+              <DriverPanel driver={driverAnalysis.driver} analyses={driverAnalysis.analyses} />
+            </>
+          ) : (
+            <p className="border-border text-muted border-t px-4 py-6 text-sm">
+              {strings.driver.selectPrompt}
+            </p>
+          )}
         </section>
         <aside className="border-border w-full border-t lg:max-h-[calc(100vh-160px)] lg:w-80 lg:border-t-0 lg:border-l">
           <RaceControlFeed messages={view.messages} sessionStartMs={dataset.startMs} />

@@ -118,6 +118,62 @@ export const METRICS = {
     reading:
       'A headwind into a braking zone helps stopping but costs straight-line speed; a tailwind into a fast corner is a common cause of sudden oversteer and lock-ups.',
   },
+  degradationSlope: {
+    title: 'Degradation',
+    what: 'Seconds of lap time lost for each lap of age on the current set of tyres.',
+    why: 'It is the rate at which staying out costs you time, and it sets the whole pit window.',
+    reading:
+      'Monza-style low-degradation tracks sit near 0.03 s/lap; abrasive ones run several times that. A negative figure means no measurable drop-off, not that the tyres are improving. Race figures are corrected for fuel burn, which otherwise hides degradation entirely.',
+  },
+  degradationConfidence: {
+    title: 'Fit confidence',
+    what: 'How much the degradation number can be trusted, from the clean laps behind it.',
+    why: 'A slope from four laps in traffic can say almost anything; the number alone hides that.',
+    reading:
+      'High means many clean laps with little scatter. Low or none means too few usable laps, or lap times too inconsistent to fit — treat any strategy call built on it as a guess.',
+  },
+  cleanLaps: {
+    title: 'Clean laps',
+    what: 'Laps used by the model, out of the laps in the stint.',
+    why: 'Only representative laps say anything about tyre pace.',
+    reading:
+      'Pit in and out laps, laps under a safety car, and laps spent within a second of the car ahead are all discarded. A stint with few clean laps is mostly traffic, and its degradation figure is weak.',
+  },
+  perLapDeficit: {
+    title: 'Deficit to fresh',
+    what: 'How much time the current tyres give away every lap versus a brand new set.',
+    why: 'This is the rate at which a pit stop is repaying itself.',
+    reading:
+      'It grows as the tyre ages. Once past roughly half a second a lap, a stop is usually overdue. A zero or negative figure means fresh rubber would not be any quicker.',
+  },
+  pitWindowRange: {
+    title: 'Pit window',
+    what: 'The laps on which stopping still gains time by the end of the race.',
+    why: 'Stop too early and you give away track position; too late and the stop never pays for itself.',
+    reading:
+      'The window closes when too few laps remain to recover the time lost in the pit lane. No window means either the tyres are still too fresh to gain anything, or the race is too near its end.',
+  },
+  breakEvenLaps: {
+    title: 'Break-even',
+    what: 'Laps of running needed after a stop before it has paid back the time it cost.',
+    why: 'It is the single number that decides whether a stop is worth making at all.',
+    reading:
+      'Compare it with the laps remaining. Fewer laps left than this and the stop loses you time, however worn the tyres are.',
+  },
+  pitLoss: {
+    title: 'Pit loss',
+    what: 'Total time a stop costs against staying on track.',
+    why: 'Everything about pit strategy is measured against this number.',
+    reading:
+      'It is far more than the stationary time: entry, the lane at the speed limit, the stop, and the exit. The stationary part is only two or three seconds of it. This figure is a per-circuit estimate, shown alongside the pit-lane time actually measured this session.',
+  },
+  lapChart: {
+    title: 'Lap times',
+    what: 'Every lap of the session for this driver, with the fitted degradation line over each stint.',
+    why: 'The shape of a stint tells you more than any single number.',
+    reading:
+      'Points above the line are laps that lost time; a stint bending upward away from its line is a tyre falling off the cliff. Faded hollow points were excluded from the fit — hover any point to see why. In a race the line often slopes gently downward even though degradation is positive: the car is getting lighter faster than the tyres are wearing out, and the quoted degradation figure has that fuel effect removed.',
+  },
 } as const satisfies Record<string, MetricExplanation>;
 
 export type MetricKey = keyof typeof METRICS;

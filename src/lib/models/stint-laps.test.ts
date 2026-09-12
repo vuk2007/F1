@@ -76,12 +76,21 @@ function interval(lapNumber: number, value: number): Interval {
 const eightCleanLaps = Array.from({ length: 8 }, (_, i) => lap(i + 1));
 
 describe('collectStintLaps', () => {
-  it('keeps every lap of a clean stint and ages the tyre by one per lap', () => {
+  it('ages the tyre by one per lap and keeps every lap but the first', () => {
     const samples = collectStintLaps(makeDataset({ laps: eightCleanLaps }), DRIVER, stint);
 
     expect(samples).toHaveLength(8);
-    expect(samples.every((s) => s.excluded === null)).toBe(true);
     expect(samples.map((s) => s.tyreAge)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    // Lap 1 is a standing start, never a representative flying lap.
+    expect(samples[0]!.excluded).toBe('standing-start');
+    expect(samples.slice(1).every((s) => s.excluded === null)).toBe(true);
+  });
+
+  it('prefers the specific pit reason over the lap-1 rule', () => {
+    const laps = [...eightCleanLaps];
+    laps[0] = lap(1, { is_pit_out_lap: true });
+    const samples = collectStintLaps(makeDataset({ laps }), DRIVER, stint);
+    expect(samples[0]!.excluded).toBe('pit-out');
   });
 
   it('carries a scrubbed set’s existing age into the stint', () => {
