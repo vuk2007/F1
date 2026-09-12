@@ -13,9 +13,10 @@ import { strings } from '@/lib/i18n/strings';
 import { buildComparison, fullThrottleShare, topSpeed } from '@/lib/models/telemetry';
 import type { SessionDataset } from '@/lib/openf1/dataset';
 import type { Driver } from '@/lib/openf1/types';
-import { useTelemetry } from '@/lib/replay/use-telemetry';
+import { useLapLocation, useTelemetry } from '@/lib/replay/use-telemetry';
 import { InfoTip } from './InfoTip';
 import { TelemetryChart } from './TelemetryChart';
+import { TrackMap } from './TrackMap';
 
 /** Laps that actually have a time, newest information first for the picker. */
 function timedLaps(dataset: SessionDataset, driverNumber: number) {
@@ -52,6 +53,7 @@ export function TelemetryPanel({ dataset, driver }: { dataset: SessionDataset; d
 
   const primary = useTelemetry(dataset, driver.driver_number, lapNumber);
   const secondary = useTelemetry(dataset, compareWith, lapNumber);
+  const location = useLapLocation(dataset, driver.driver_number, lapNumber);
 
   const rows = useMemo(
     () => buildComparison(primary.points, compareWith == null ? null : secondary.points),
@@ -140,11 +142,22 @@ export function TelemetryPanel({ dataset, driver }: { dataset: SessionDataset; d
           {compareWith != null && secondary.loading && (
             <p className="text-muted mb-2 text-xs">{strings.telemetry.loadingComparison}</p>
           )}
-          <TelemetryChart
-            rows={rows}
-            labelA={driver.name_acronym}
-            labelB={compareDriver && !secondary.loading ? compareDriver.name_acronym : null}
-          />
+          <div className="flex flex-col gap-4 xl:flex-row">
+            <div className="min-w-0 flex-1">
+              <TelemetryChart
+                rows={rows}
+                labelA={driver.name_acronym}
+                labelB={compareDriver && !secondary.loading ? compareDriver.name_acronym : null}
+              />
+            </div>
+            <div className="w-full xl:w-[340px] xl:shrink-0">
+              <TrackMap
+                location={location.points}
+                telemetry={primary.points}
+                loading={location.loading}
+              />
+            </div>
+          </div>
         </>
       )}
     </section>

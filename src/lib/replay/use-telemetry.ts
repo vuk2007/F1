@@ -10,7 +10,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { SessionDataset } from '@/lib/openf1/dataset';
-import { getCarData } from '@/lib/openf1/client';
+import type { LocationPoint } from '@/lib/openf1/types';
+import { getCarData, getLocation } from '@/lib/openf1/client';
 import { lapWindow, toDistanceSeries, type TelemetryPoint } from '@/lib/models/telemetry';
 import { strings } from '@/lib/i18n/strings';
 
@@ -89,4 +90,62 @@ export function useTelemetry(
    */
   if (loaded?.key !== key) return { points: [], loading: true, error: null };
   return { points: loaded.points, loading: false, error: loaded.error };
+}
+
+export interface LocationState {
+  points: LocationPoint[];
+  loading: boolean;
+  error: string | null;
+}
+
+const LOCATION_IDLE: LocationState = { points: [], loading: false, error: null };
+
+/**
+ * Track position for one driver and one lap.
+ *
+ * Same shape and same caution as `useTelemetry`: the location feed is ~4Hz per
+ * car, so it is only ever fetched for a single lap that the user asked to see.
+ */
+export function useLapLocation(
+  dataset: SessionDataset | null,
+  driverNumber: number | null,
+  lapNumber: number | null,
+): LocationState {
+  const [loaded, setLoaded] = useState<{ key: string; points: LocationPoint[] } | null>(null);
+
+  const window = useMemo(() => {
+    if (!dataset || driverNumber == null || lapNumber == null) return null;
+    const lap = dataset.laps.find(
+      (candidate) => candidate.driver_number === driverNumber && candidate.lap_number === lapNumber,
+    );
+    return lap ? lapWindow(lap) : null;
+  }, [dataset, driverNumber, lapNumber]);
+
+  const sessionKey = dataset?.session.session_key ?? null;
+  const key =
+    window && sessionKey != null && driverNumber != null
+      ? `${sessionKey}|${driverNumber}|${window.from}`
+      : null;
+
+  useEffect(() => {
+    if (!key || !window || sessionKey == null || driverNumber == null) return;
+
+    let cancelled = false;
+    getLocation(sessionKey, driverNumber, window.from, window.to)
+      .then((points) => {
+        if (!cancelled) setLoaded({ key, points });
+      })
+      .catch(() => {
+        // A missing map is a cosmetic loss; the traces still carry the analysis.
+        if (!cancelled) setLoaded({ key, points: [] });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [key, window, sessionKey, driverNumber]);
+
+  if (driverNumber == null || lapNumber == null || !window || !key) return LOCATION_IDLE;
+  if (loaded?.key !== key) return { points: [], loading: true, error: null };
+  return { points: loaded.points, loading: false, error: null };
 }

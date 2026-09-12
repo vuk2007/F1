@@ -184,6 +184,17 @@ export const strings = {
       'Distance is integrated from speed and is accurate to about 1%, so it is an estimate rather than a track position.',
   },
 
+  trackMap: {
+    heading: 'Track map',
+    loading: 'Loading track position...',
+    noData: 'No track position recorded for this lap.',
+    altText: 'Map of the circuit traced from the car, coloured by speed',
+    slow: 'Slow',
+    fast: 'Fast',
+    braking: 'Braking',
+    zones: (n: number) => `${n} braking zone${n === 1 ? '' : 's'}`,
+  },
+
   undercut: {
     heading: 'Undercut',
     ahead: 'Car ahead',

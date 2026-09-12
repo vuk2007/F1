@@ -75,6 +75,12 @@ describe('toDistanceSeries', () => {
     expect(shuffled.map((p) => p.distance)).toEqual(ordered.map((p) => p.distance));
   });
 
+  it('keeps the absolute sample time for aligning other feeds', () => {
+    const points = toDistanceSeries([sample(0, 300), sample(240, 300)]);
+    expect(points[0]!.dateMs).toBe(T0);
+    expect(points[1]!.dateMs).toBe(T0 + 240);
+  });
+
   it('carries every channel through', () => {
     const points = toDistanceSeries([
       sample(0, 300, { throttle: 80, brake: 0, n_gear: 7, drs: 12 }),
@@ -163,10 +169,37 @@ describe('topSpeed', () => {
 describe('fullThrottleShare', () => {
   it('measures the share of lap time at full throttle', () => {
     const points: TelemetryPoint[] = [
-      { distance: 0, time: 0, speed: 300, throttle: 100, brake: 0, gear: 8, drs: 0 },
-      { distance: 100, time: 1, speed: 300, throttle: 100, brake: 0, gear: 8, drs: 0 },
-      { distance: 200, time: 2, speed: 200, throttle: 0, brake: 100, gear: 4, drs: 0 },
-      { distance: 300, time: 3, speed: 200, throttle: 0, brake: 100, gear: 4, drs: 0 },
+      { distance: 0, time: 0, dateMs: T0, speed: 300, throttle: 100, brake: 0, gear: 8, drs: 0 },
+      {
+        distance: 100,
+        time: 1,
+        dateMs: T0 + 1000,
+        speed: 300,
+        throttle: 100,
+        brake: 0,
+        gear: 8,
+        drs: 0,
+      },
+      {
+        distance: 200,
+        time: 2,
+        dateMs: T0 + 2000,
+        speed: 200,
+        throttle: 0,
+        brake: 100,
+        gear: 4,
+        drs: 0,
+      },
+      {
+        distance: 300,
+        time: 3,
+        dateMs: T0 + 3000,
+        speed: 200,
+        throttle: 0,
+        brake: 100,
+        gear: 4,
+        drs: 0,
+      },
     ];
     // Two of the three intervals start at full throttle.
     expect(fullThrottleShare(points)).toBeCloseTo(2 / 3, 6);

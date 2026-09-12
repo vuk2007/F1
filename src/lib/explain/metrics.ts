@@ -230,6 +230,13 @@ export const METRICS = {
     reading:
       'Compare it only against runs on the same compound with similar fuel. Laps outside 107% of the session best — in-laps, cool-down laps, garage time — are excluded, so the average reflects real running.',
   },
+  trackMap: {
+    title: 'Track map',
+    what: 'The circuit traced from the car’s own position feed for the selected lap, coloured by speed.',
+    why: 'It turns a number on the telemetry axis into a place you can point at.',
+    reading:
+      'Light means fast, dark means slow, and the orange overlay marks where the brake was on. The shape is the driver’s actual line, not an idealised circuit drawing, so it shifts slightly lap to lap. The open circle is where the lap started.',
+  },
 } as const satisfies Record<string, MetricExplanation>;
 
 export type MetricKey = keyof typeof METRICS;

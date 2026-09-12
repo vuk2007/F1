@@ -21,6 +21,12 @@ export interface TelemetryPoint {
   distance: number;
   /** Seconds since the start of the lap. */
   time: number;
+  /**
+   * Absolute sample time, epoch ms. Kept so other feeds sampled on their own
+   * clock — track position, for one — can be aligned exactly rather than by
+   * assuming both series start at the same instant.
+   */
+  dateMs: number;
   speed: number;
   throttle: number;
   /** 0 or 100, as the API reports it. */
@@ -71,6 +77,7 @@ export function toDistanceSeries(samples: CarData[]): TelemetryPoint[] {
     points.push({
       distance,
       time: (t - startMs) / 1000,
+      dateMs: t,
       speed: sample.speed,
       throttle: sample.throttle,
       brake: sample.brake,
@@ -107,6 +114,7 @@ function interpolateAt(points: TelemetryPoint[], distance: number): TelemetryPoi
   return {
     distance,
     time: lerp(a.time, b.time),
+    dateMs: lerp(a.dateMs, b.dateMs),
     speed: lerp(a.speed, b.speed),
     throttle: lerp(a.throttle, b.throttle),
     // Discrete channels must not be averaged into meaningless in-between values.
