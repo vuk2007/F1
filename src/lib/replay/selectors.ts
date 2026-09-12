@@ -205,14 +205,12 @@ export function currentLapNumber(
   driverNumber: number,
   timeMs: number,
 ): number | null {
-  let best: number | null = null;
-  for (const lap of dataset.laps) {
-    if (lap.driver_number !== driverNumber || !lap.date_start) continue;
-    if (Date.parse(lap.date_start) <= timeMs) {
-      if (best == null || lap.lap_number > best) best = lap.lap_number;
-    }
-  }
-  return best;
+  const index = getReplayIndex(dataset);
+  const starts = index.lapStartsByDriver.get(driverNumber);
+  if (!starts) return null;
+  const at = lastIndexAtOrBefore(starts, timeMs);
+  if (at === -1) return null;
+  return index.runningLapNumber.get(driverNumber)?.[at] ?? null;
 }
 
 /** Full timing row for one driver at a given time. */
@@ -312,10 +310,5 @@ export function leaderLapAt(dataset: SessionDataset, timeMs: number): number | n
   const index = getReplayIndex(dataset);
   const at = lastIndexAtOrBefore(index.allCompletedLaps, timeMs);
   if (at === -1) return null;
-  let maxLap = 0;
-  for (let i = 0; i <= at; i += 1) {
-    const value = index.allCompletedLaps[i]!.value.lap.lap_number;
-    if (value > maxLap) maxLap = value;
-  }
-  return maxLap;
+  return index.runningLeaderLap[at] ?? null;
 }

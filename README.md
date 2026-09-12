@@ -14,15 +14,15 @@ pnpm install
 pnpm dev          # http://localhost:3000
 ```
 
-| Script             | What it does                                                  |
-| ------------------ | ------------------------------------------------------------- |
-| `pnpm dev`         | Dev server                                                     |
-| `pnpm build`       | Production build                                               |
-| `pnpm test`        | Unit tests (offline, fast)                                     |
-| `pnpm smoke`       | End-to-end test against the real 2025 Monza race (needs network) |
-| `pnpm typecheck`   | `tsc --noEmit`                                                 |
-| `pnpm lint`        | ESLint                                                         |
-| `pnpm format`      | Prettier                                                       |
+| Script           | What it does                                                     |
+| ---------------- | ---------------------------------------------------------------- |
+| `pnpm dev`       | Dev server                                                       |
+| `pnpm build`     | Production build                                                 |
+| `pnpm test`      | Unit tests (offline, fast)                                       |
+| `pnpm smoke`     | End-to-end test against the real 2025 Monza race (needs network) |
+| `pnpm typecheck` | `tsc --noEmit`                                                   |
+| `pnpm lint`      | ESLint                                                           |
+| `pnpm format`    | Prettier                                                         |
 
 `node scripts/verify-schema.ts [session_key]` diffs the declared OpenF1 types against real API
 responses and reports missing, extra, nullable and union-typed fields.

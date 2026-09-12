@@ -35,10 +35,16 @@ export interface ReplayIndex {
   lapsByDriver: Map<number, Timed<CompletedLap>[]>;
   /** Running personal bests, index-aligned with `lapsByDriver`. */
   personalBests: Map<number, RunningBests[]>;
+  /** Laps per driver sorted by START time, for "which lap are they on right now". */
+  lapStartsByDriver: Map<number, Timed<Lap>[]>;
+  /** Highest lap number started so far, index-aligned with `lapStartsByDriver`. */
+  runningLapNumber: Map<number, number[]>;
   /** All completed laps across all drivers, sorted by completion time. */
   allCompletedLaps: Timed<CompletedLap>[];
   /** Running session bests, index-aligned with `allCompletedLaps`. */
   sessionBests: RunningBests[];
+  /** Highest lap number completed by anyone so far, aligned with `allCompletedLaps`. */
+  runningLeaderLap: number[];
   weather: Timed<Weather>[];
   raceControl: Timed<RaceControl>[];
   driverNumbers: number[];
@@ -86,6 +92,20 @@ function runningBests(laps: Timed<CompletedLap>[]): RunningBests[] {
   return result;
 }
 
+/**
+ * Prefix maxima. Lap numbers normally rise with time, but a running max is
+ * robust to out-of-order rows and costs nothing.
+ */
+function runningMax(values: number[]): number[] {
+  const result: number[] = [];
+  let max = 0;
+  for (const value of values) {
+    if (value > max) max = value;
+    result.push(max);
+  }
+  return result;
+}
+
 export function buildReplayIndex(dataset: SessionDataset): ReplayIndex {
   const positionsByDriver = new Map<number, Timed<Position>[]>();
   for (const [driver, rows] of groupBy(dataset.positions, (p) => p.driver_number)) {
@@ -113,10 +133,16 @@ export function buildReplayIndex(dataset: SessionDataset): ReplayIndex {
 
   const lapsByDriver = new Map<number, Timed<CompletedLap>[]>();
   const personalBests = new Map<number, RunningBests[]>();
+  const lapStartsByDriver = new Map<number, Timed<Lap>[]>();
+  const runningLapNumber = new Map<number, number[]>();
   for (const [driver, rows] of groupBy(dataset.laps, (l) => l.driver_number)) {
     const completed = toCompletedLaps(rows);
     lapsByDriver.set(driver, completed);
     personalBests.set(driver, runningBests(completed));
+
+    const starts = toTimed(rows, (r) => r.date_start);
+    lapStartsByDriver.set(driver, starts);
+    runningLapNumber.set(driver, runningMax(starts.map((s) => s.value.lap_number)));
   }
 
   const allCompletedLaps = toCompletedLaps(dataset.laps);
@@ -127,8 +153,11 @@ export function buildReplayIndex(dataset: SessionDataset): ReplayIndex {
     pitsByDriver,
     lapsByDriver,
     personalBests,
+    lapStartsByDriver,
+    runningLapNumber,
     allCompletedLaps,
     sessionBests: runningBests(allCompletedLaps),
+    runningLeaderLap: runningMax(allCompletedLaps.map((l) => l.value.lap.lap_number)),
     weather: toTimed(dataset.weather, (w) => w.date),
     raceControl: toTimed(dataset.raceControl, (r) => r.date),
     driverNumbers: dataset.drivers.map((d) => d.driver_number),
