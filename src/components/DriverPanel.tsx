@@ -1,5 +1,7 @@
 'use client';
 
+import { memo } from 'react';
+
 /**
  * Per-driver detail: lap chart with degradation fits, plus a per-stint summary.
  *
@@ -81,7 +83,7 @@ function StintRow({ analysis }: { analysis: StintAnalysis }) {
   );
 }
 
-export function DriverPanel({ driver, analyses }: { driver: Driver; analyses: StintAnalysis[] }) {
+function DriverPanelInner({ driver, analyses }: { driver: Driver; analyses: StintAnalysis[] }) {
   return (
     <section className="border-border border-t">
       <header className="border-border flex items-center gap-2 border-b px-4 py-2.5">
@@ -118,3 +120,11 @@ export function DriverPanel({ driver, analyses }: { driver: Driver; analyses: St
     </section>
   );
 }
+
+/*
+ * Memoised because the replay clock re-renders this whole subtree every frame,
+ * while these props depend only on the dataset and the selected driver.
+ * Recharts re-renders on any parent render even when its props are identical,
+ * and measured on Monza that cost 60fps -> 10fps with the panels open.
+ */
+export const DriverPanel = memo(DriverPanelInner);

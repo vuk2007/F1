@@ -7,7 +7,7 @@
  * via useMemo keyed on the replay time.
  */
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DriverPanel } from '@/components/DriverPanel';
 import { RaceControlFeed } from '@/components/RaceControlFeed';
 import { ReplayControls } from '@/components/ReplayControls';
@@ -142,33 +142,46 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
    * team-mate, which is the comparison with the fewest confounds: same car,
    * same strategy window, usually the same tyres.
    */
-  const [paceSelection, setPaceSelection] = useState<number[] | null>(null);
+  const [paceDrivers, setPaceDrivers] = useState<number[]>([]);
+  const [paceFor, setPaceFor] = useState<number | null>(null);
 
-  const paceDrivers = useMemo(() => {
-    if (!dataset || !driverAnalysis) return [];
-    if (paceSelection) return paceSelection;
-
+  /*
+   * Reset the selection when the user picks a different driver. Done during
+   * render rather than in an effect — this is state derived from a prop, and an
+   * effect would render the stale selection once before correcting it.
+   */
+  if (dataset && driverAnalysis && paceFor !== driverAnalysis.driver.driver_number) {
     const me = driverAnalysis.driver;
     const teamMate = dataset.drivers.find(
       (d) =>
         d.team_name != null && d.team_name === me.team_name && d.driver_number !== me.driver_number,
     );
-    return teamMate ? [me.driver_number, teamMate.driver_number] : [me.driver_number];
-  }, [dataset, driverAnalysis, paceSelection]);
+    setPaceFor(me.driver_number);
+    setPaceDrivers(teamMate ? [me.driver_number, teamMate.driver_number] : [me.driver_number]);
+  }
+
+  /*
+   * A functional update, so two clicks batched into the same render both land,
+   * and a stable identity, so the memo around the chart survives the clock.
+   */
+  const togglePaceDriver = useCallback((driverNumber: number) => {
+    setPaceDrivers((current) => {
+      if (current.includes(driverNumber)) return current.filter((n) => n !== driverNumber);
+      if (current.length >= MAX_PACE_DRIVERS) return current;
+      return [...current, driverNumber];
+    });
+  }, []);
 
   const pace = useMemo(() => {
     if (!dataset || paceDrivers.length === 0) return null;
     return buildPaceComparison(dataset, paceDrivers);
   }, [dataset, paceDrivers]);
 
-  const togglePaceDriver = (driverNumber: number) => {
-    setPaceSelection((current) => {
-      const base = current ?? paceDrivers;
-      if (base.includes(driverNumber)) return base.filter((n) => n !== driverNumber);
-      if (base.length >= MAX_PACE_DRIVERS) return base;
-      return [...base, driverNumber];
-    });
-  };
+  /* A fresh array every render would break the memo around the chart. */
+  const paceDriverRows = useMemo(
+    () => (dataset ? dataset.drivers.filter((d) => paceDrivers.includes(d.driver_number)) : []),
+    [dataset, paceDrivers],
+  );
 
   /*
    * Practice and qualifying analysis. Independent of the replay clock: a run is
@@ -421,7 +434,7 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
               {pace && (
                 <PaceComparison
                   comparison={pace}
-                  drivers={dataset.drivers.filter((d) => paceDrivers.includes(d.driver_number))}
+                  drivers={paceDriverRows}
                   allDrivers={dataset.drivers}
                   selected={paceDrivers}
                   onToggle={togglePaceDriver}

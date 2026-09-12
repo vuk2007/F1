@@ -1,5 +1,7 @@
 'use client';
 
+import { memo } from 'react';
+
 /**
  * Several drivers' clean lap times on one chart.
  *
@@ -38,7 +40,7 @@ export const MAX_PACE_DRIVERS = SERIES.length;
 const GRID = '#262c35';
 const AXIS = '#8b96a5';
 
-export function PaceComparison({
+function PaceComparisonInner({
   comparison,
   drivers,
   allDrivers,
@@ -51,6 +53,12 @@ export function PaceComparison({
   /** Everyone available to add. */
   allDrivers: Driver[];
   selected: number[];
+  /**
+   * Reports only which driver was clicked. The parent applies it as a functional
+   * state update, so two clicks landing in the same React batch both take
+   * effect — computing the next list from the `selected` prop here looked
+   * simpler but silently dropped one of them.
+   */
   onToggle: (driverNumber: number) => void;
 }) {
   const keys = comparison.summaries.map((summary) => summary.key);
@@ -196,3 +204,6 @@ export function PaceComparison({
     </section>
   );
 }
+
+/* See DriverPanel: the comparison depends on the selection, never on the clock. */
+export const PaceComparison = memo(PaceComparisonInner);

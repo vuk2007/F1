@@ -1,5 +1,7 @@
 'use client';
 
+import { memo } from 'react';
+
 /**
  * Lap times across a driver's stints, with each stint's fitted degradation line
  * drawn over it.
@@ -150,7 +152,7 @@ function ChartTooltip({ active, payload }: TooltipInjectedProps) {
   );
 }
 
-export function LapChart({ analyses }: { analyses: StintAnalysis[] }) {
+function LapChartInner({ analyses }: { analyses: StintAnalysis[] }) {
   const rows = buildRows(analyses);
   if (rows.length === 0) {
     return <p className="text-muted p-4 text-sm">{strings.timing.noData}</p>;
@@ -230,3 +232,6 @@ export function LapChart({ analyses }: { analyses: StintAnalysis[] }) {
     </div>
   );
 }
+
+/* See DriverPanel: the clock must not force a chart redraw every frame. */
+export const LapChart = memo(LapChartInner);

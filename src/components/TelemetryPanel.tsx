@@ -7,7 +7,7 @@
  * panel loads a lap only when the user actually asks for it rather than
  * speculatively pulling telemetry for the whole field.
  */
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { formatLapTime } from '@/lib/format';
 import { strings } from '@/lib/i18n/strings';
 import { buildComparison, fullThrottleShare, topSpeed } from '@/lib/models/telemetry';
@@ -34,7 +34,7 @@ function fastestLapNumber(dataset: SessionDataset, driverNumber: number): number
   return best?.lap ?? null;
 }
 
-export function TelemetryPanel({ dataset, driver }: { dataset: SessionDataset; driver: Driver }) {
+function TelemetryPanelInner({ dataset, driver }: { dataset: SessionDataset; driver: Driver }) {
   const laps = useMemo(() => timedLaps(dataset, driver.driver_number), [dataset, driver]);
   const defaultLap = useMemo(
     () => fastestLapNumber(dataset, driver.driver_number),
@@ -163,3 +163,6 @@ export function TelemetryPanel({ dataset, driver }: { dataset: SessionDataset; d
     </section>
   );
 }
+
+/* See DriverPanel: five charts and a track map, none of them clock-dependent. */
+export const TelemetryPanel = memo(TelemetryPanelInner);

@@ -13,7 +13,7 @@
  * braking zones are ALSO marked with a thicker overlay stroke, so the most
  * important feature of a lap survives for a colourblind reader and in print.
  */
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { strings } from '@/lib/i18n/strings';
 import { buildTrackMap, speedColour, SPEED_RAMP } from '@/lib/models/track-map';
 import type { TelemetryPoint } from '@/lib/models/telemetry';
@@ -22,7 +22,7 @@ import { InfoTip } from './InfoTip';
 
 const BRAKE_COLOUR = '#d95926';
 
-export function TrackMap({
+function TrackMapInner({
   location,
   telemetry,
   loading,
@@ -152,3 +152,6 @@ export function TrackMap({
     </div>
   );
 }
+
+/* See DriverPanel: ~330 SVG segments that do not change as the clock advances. */
+export const TrackMap = memo(TrackMapInner);
