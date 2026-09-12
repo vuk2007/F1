@@ -92,9 +92,19 @@ export default function PickerPage() {
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-10">
-      <header className="mb-10">
-        <h1 className="text-3xl font-semibold tracking-tight">{strings.app.name}</h1>
-        <p className="text-muted mt-2 max-w-xl text-sm">{strings.app.tagline}</p>
+      <header className="mb-10 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">{strings.app.name}</h1>
+          <p className="text-muted mt-2 max-w-xl text-sm">{strings.app.tagline}</p>
+        </div>
+        {/* The other source. Needs the bridge running locally, so it is a quiet
+            link rather than a call to action. */}
+        <Link
+          href="/live"
+          className="border-border hover:border-accent/60 hover:bg-surface-2 mt-1 rounded-md border px-3 py-1.5 text-xs transition"
+        >
+          {strings.live.heading}
+        </Link>
       </header>
 
       {lockedOut && (

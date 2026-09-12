@@ -159,6 +159,8 @@ The normalizers that turn feed topics into the app's OpenF1-shaped types are
 written, in `src/lib/live/`, and tested against the committed fixture — including
 an end-to-end test that pushes a real captured session through merge, normalize
 and accumulate and then runs the app's own selectors and models over the result.
+The /live page has been driven in a real browser against this bridge, and a
+recording written by it has been loaded back through the page's file picker.
 
 What is **not** verified is everything that only exists while cars are on track:
 
@@ -166,11 +168,15 @@ What is **not** verified is everything that only exists while cars are on track:
   capture, because an idle feed carries neither topic. The channel numbers
   (0 RPM, 2 speed, 3 gear, 4 throttle, 5 brake, 45 DRS) are the least certain thing
   in the whole pipeline.
-- Which of a sector's `Value` and `PreviousValue` holds the lap that just finished,
-  at the instant `LastLapTime` updates.
-- Whether `NumberOfLaps` counts laps started, as three cross-checks in the capture
-  say it does, during a session rather than after one.
-- That deltas merge correctly over hours rather than over one snapshot.
+- How often a live `LastLapTime` update arrives with sectors that add up to it. The
+  rule is only to attach sectors when they do — a snapshot showed car 44's sectors
+  belonging to a lap that never finished — so if they rarely match live, laps will
+  show without sector times and the rule needs revisiting, not the data trusting.
+- That `NumberOfLaps` numbers the last lap correctly as it happens. Two cars in the
+  capture disagree about whether it counts laps started or completed, so it is
+  only used when the sectors corroborate the lap.
+- That deltas merge correctly over hours rather than over one snapshot, and that a
+  browser following the live edge for a whole race stays responsive.
 
 The rule that caught the most bugs in this project was "do not invent field names".
 The assumptions about this feed have already been wrong twice — the endpoint and

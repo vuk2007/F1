@@ -7,7 +7,7 @@
  * via useMemo keyed on the replay time.
  */
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { DriverPanel } from '@/components/DriverPanel';
 import { RaceControlFeed } from '@/components/RaceControlFeed';
 import { ReplayControls } from '@/components/ReplayControls';
@@ -47,7 +47,30 @@ import {
 } from '@/lib/replay/selectors';
 import { useSessionStore } from '@/lib/store/session-store';
 
-export function SessionView({ sessionKey }: { sessionKey: number }) {
+/**
+ * `openf1` downloads a session by key. `live` expects something else to be filling
+ * the store — see `use-live-source.ts` — and only renders it.
+ *
+ * The rendering below is identical either way, which is the point: a live session is
+ * the same `SessionDataset` arriving in instalments, so it gets the same screen
+ * rather than a second one that drifts out of step.
+ */
+export type SessionViewMode = 'openf1' | 'live';
+
+export function SessionView({
+  sessionKey,
+  mode = 'openf1',
+  statusBar,
+  waiting,
+}: {
+  /** Required for `openf1`; a live session names itself. */
+  sessionKey?: number;
+  mode?: SessionViewMode;
+  /** Rendered above the replay controls, for live mode's connection state. */
+  statusBar?: ReactNode;
+  /** Replaces the download progress bar while no dataset has arrived. */
+  waiting?: ReactNode;
+}) {
   const dataset = useSessionStore((s) => s.dataset);
   const status = useSessionStore((s) => s.status);
   const progress = useSessionStore((s) => s.progress);
@@ -60,6 +83,9 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
   useReplayClock();
 
   useEffect(() => {
+    // In live mode the store is filled from the bridge; there is nothing to fetch.
+    if (mode !== 'openf1' || sessionKey === undefined) return;
+
     const store = useSessionStore.getState();
     // Already holding this session (e.g. a re-render or client-side nav back).
     if (store.dataset?.session.session_key === sessionKey && store.status === 'ready') return;
@@ -87,7 +113,7 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionKey]);
+  }, [sessionKey, mode]);
 
   /*
    * Selectors are pure, so memoising on (dataset, timeMs) is enough. The clock
@@ -350,6 +376,12 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
   }
 
   if (status !== 'ready' || !dataset || !view) {
+    /*
+     * Live mode has nothing to show a percentage of — it is waiting on a session to
+     * start, not on a download — so it supplies its own waiting screen.
+     */
+    if (waiting !== undefined) return <>{waiting}</>;
+
     const pct = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
     const partLabel = progress ? (strings.load.parts[progress.part] ?? progress.part) : '';
     return (
@@ -386,6 +418,8 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
           {strings.load.backToPicker}
         </Link>
       </header>
+
+      {statusBar}
 
       <ReplayControls
         startMs={dataset.startMs}

@@ -80,6 +80,24 @@ pnpm bridge:capture 60 # save 60s of raw frames to bridge/fixtures/ for tests to
 Everything it sees is written to `recordings/<session>.jsonl`, so a session that happens once
 can be replayed offline as many times as the analysis needs.
 
+With the bridge running, open **/live** (the "Live timing" link on the session picker). It is
+the same screen as a replay, fed from the bridge instead of OpenF1: it follows the live edge,
+stops following the moment you scrub back, and "Jump to live" resumes. The status bar shows
+whether the bridge and the feed are each up, and how many seconds since anything arrived —
+between sessions the feed sends nothing at all, so that number is what tells a quiet feed
+from a broken one. "Open a recording" loads a `.jsonl` file into the same screen, and pauses
+the live connection until "Back to live" so a bridge starting up cannot overwrite it.
+
+Two things a snapshot cannot give, and the screen does not pretend to:
+
+- **Lap history.** The feed carries current state plus each driver's best laps, so a page
+  opened mid-session shows those laps and builds the rest as they happen. Sector times are
+  only attached to a lap when they add up to that lap's time — the feed updates the three
+  sectors independently, and trusting them put a 1:55 best lap on screen for a driver whose
+  best was 1:32.
+- **Pit stop durations.** The feed does not publish them, so pit loss reads as unknown for a
+  live session rather than as a wrong number.
+
 See [bridge/README.md](bridge/README.md) for the handshake, which open-source clients it was
 based on, and the two things most write-ups about this feed get wrong. It is for personal,
 non-commercial use only. OpenF1 remains the source for all historical and replay data.
@@ -147,6 +165,10 @@ data, not chosen on theory:
   and an (i) explanation on every metric.
 - **Phase 4 — done.** Practice/qualifying mode with long-run vs short-run classification and
   theoretical best lap, plus deploy configuration.
+- **Phase 5 — built, awaiting a live session.** Local bridge to F1's live timing feed, JSONL
+  recordings, normalizers into the OpenF1 shapes, and a /live page that can also replay a
+  recording. Everything is verified against a real captured snapshot; what only exists while
+  cars are on track is listed in [bridge/README.md](bridge/README.md#status).
 
 ## Beyond the brief
 

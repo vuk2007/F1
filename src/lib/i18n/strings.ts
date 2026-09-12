@@ -24,6 +24,42 @@ export const strings = {
     selectMeetingFirst: 'Pick a Grand Prix to see its sessions.',
   },
 
+  live: {
+    heading: 'Live timing',
+    /* The toggle. "Replay" is the OpenF1 path, which is everything else in the app. */
+    modeLive: 'Live',
+    modeReplay: 'Replay',
+    waitingHeading: 'Waiting for the session',
+    waitingBody:
+      'Connected to the bridge. Between sessions the feed sends nothing at all, so this is what a working connection looks like when no cars are on track.',
+    noBridgeHeading: 'No bridge running',
+    noBridgeBody:
+      'Live timing comes from a small process on this machine, not from the website. Start it with `pnpm bridge` and this page will connect on its own.',
+    connected: 'Bridge connected',
+    disconnected: 'Bridge offline',
+    feedUp: 'Feed live',
+    feedDown: 'Feed down',
+    following: 'Following live',
+    holding: 'Scrubbed back',
+    jumpToLive: 'Jump to live',
+    lastMessage: (seconds: number) =>
+      seconds < 1 ? 'updated just now' : `updated ${Math.round(seconds)}s ago`,
+    noMessages: 'nothing received yet',
+    rows: (n: number) => `${n.toLocaleString()} rows`,
+    /* Loading a recording the bridge wrote, as an offline replay source. */
+    openRecording: 'Open a recording',
+    recordingHint: 'A .jsonl file written by the bridge.',
+    recordingLoaded: (messages: number, skipped: number) =>
+      skipped > 0
+        ? `${messages.toLocaleString()} messages, ${skipped.toLocaleString()} unreadable`
+        : `${messages.toLocaleString()} messages`,
+    recordingFailed: 'That file could not be read as a recording.',
+    replayingRecording: 'Replaying a recording',
+    backToLive: 'Back to live',
+    loadingRecordingHeading: 'Reading the recording',
+    loadingRecordingBody: 'A full session is a large file; this can take a few seconds.',
+  },
+
   load: {
     heading: 'Downloading session',
     subheading: 'Data is fetched once and cached in your browser, so this is instant next time.',
