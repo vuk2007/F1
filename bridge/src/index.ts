@@ -19,7 +19,14 @@ const state = new FeedState();
 let recorder: Recorder | null = null;
 let stopping = false;
 
-const server = new BridgeServer({ port: config.port, snapshot: () => state.all() });
+/** Whether the upstream feed is up, which the server reports to new clients. */
+let feedConnected = false;
+
+const server = new BridgeServer({
+  port: config.port,
+  snapshot: () => state.all(),
+  feedConnected: () => feedConnected,
+});
 
 function log(message: string): void {
   console.log(`[bridge] ${new Date().toISOString().slice(11, 19)} ${message}`);
@@ -55,6 +62,7 @@ async function connect(): Promise<void> {
         onMessage,
         onClose: (reason) => {
           log(`feed closed: ${reason}`);
+          feedConnected = false;
           server.broadcastStatus(false, reason);
           if (!stopping) scheduleReconnect();
         },
@@ -77,6 +85,7 @@ async function connect(): Promise<void> {
     }
     recorder.write({ type: 'snapshot', data: feed.snapshot });
 
+    feedConnected = true;
     server.broadcastSnapshot();
     server.broadcastStatus(true);
 
@@ -87,6 +96,7 @@ async function connect(): Promise<void> {
     }
   } catch (error) {
     log(`connect failed: ${error instanceof Error ? error.message : String(error)}`);
+    feedConnected = false;
     server.broadcastStatus(false, 'connect failed');
     scheduleReconnect();
   }

@@ -10,9 +10,10 @@
  *   { type: "subscribeDriver", driverNumber }
  *
  * `delta` carries the topic's **merged** value rather than the raw patch. The
- * merge rules are unusual enough (see snapshot.ts) that doing them once here is
- * better than shipping them to every client — and it means a client that joins
- * mid-session and one that has been listening all along see the same shapes.
+ * merge rules are unusual enough (see ../../src/lib/live/feed-state.ts) that doing
+ * them once here is better than shipping them to every client — and it means a
+ * client that joins mid-session and one that has been listening all along see the
+ * same shapes.
  */
 import { WebSocketServer, WebSocket } from 'ws';
 
@@ -20,6 +21,14 @@ export interface BridgeServerOptions {
   port: number;
   /** Called when a client connects, to get the state to send it. */
   snapshot: () => Record<string, unknown>;
+  /**
+   * Whether the upstream feed is currently up.
+   *
+   * Needed because `status` is otherwise only broadcast when it changes, so a
+   * browser opened ten minutes into a session would never be told the feed was
+   * fine and would sit there reporting it as down.
+   */
+  feedConnected: () => boolean;
 }
 
 interface Client {
@@ -32,11 +41,13 @@ export class BridgeServer {
   #wss: WebSocketServer;
   #clients = new Set<Client>();
   #snapshot: () => Record<string, unknown>;
+  #feedConnected: () => boolean;
   /** Resolves once the port is actually bound — see `url`. */
   #listening: Promise<void>;
 
   constructor(options: BridgeServerOptions) {
     this.#snapshot = options.snapshot;
+    this.#feedConnected = options.feedConnected;
     this.#wss = new WebSocketServer({ port: options.port, host: '127.0.0.1' });
     this.#listening = new Promise((resolve, reject) => {
       this.#wss.once('listening', () => resolve());
@@ -48,6 +59,8 @@ export class BridgeServer {
       this.#clients.add(client);
 
       send(socket, { type: 'snapshot', data: this.#snapshot() });
+      // Straight after, so a client that joins mid-session knows where it stands.
+      send(socket, { type: 'status', connected: this.#feedConnected() });
 
       socket.on('message', (payload: Buffer) => {
         let message: { type?: unknown; driverNumber?: unknown };
@@ -61,7 +74,7 @@ export class BridgeServer {
            * Recorded but not yet acted on. The obvious use is to stop forwarding
            * every car's telemetry, but the shape of CarData.z has not been seen
            * from a live session yet, and filtering on a guessed shape would drop
-           * real data silently. It lands with the normalizers.
+           * real data silently. It stays inert until a capture confirms it.
            */
           client.driverNumber = message.driverNumber;
         }
