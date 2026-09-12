@@ -129,6 +129,25 @@ data, not chosen on theory:
 - **Phase 4 — done.** Practice/qualifying mode with long-run vs short-run classification and
   theoretical best lap, plus deploy configuration.
 
+## Beyond the brief
+
+Two additions that fell out of having the data already typed and verified:
+
+- **Circuit map**, traced from the `location` feed for the selected telemetry lap and
+  coloured by speed, with the braking zones marked. It makes the traces spatial — the brake
+  chart says something happened at 3200m, the map says it was the second chicane.
+- **Pace comparison** for up to five drivers, plotting their representative laps together
+  with each driver's median. Gaps in a line are the excluded laps, so nobody is made to look
+  slow for pitting.
+
+### A performance note
+
+With every panel open the replay dropped from 60fps to **9.8fps**. The cause was not the
+volume of work: the clock writes a new time every frame, so the whole subtree re-rendered,
+and Recharts redraws on any parent render even when its props are identical. Memoising the
+panels whose props depend only on the dataset restored 60fps with the same six charts on
+screen. Worth knowing before adding another chart to that page.
+
 ## Deploying
 
 `vercel.json` pins the framework, pnpm commands and a few security headers; `package.json`
