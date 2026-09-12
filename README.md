@@ -23,6 +23,7 @@ pnpm dev          # http://localhost:3000
 | `pnpm typecheck` | `tsc --noEmit`                                                   |
 | `pnpm lint`      | ESLint                                                           |
 | `pnpm format`    | Prettier                                                         |
+| `pnpm bridge`    | Live timing bridge (see `bridge/`)                               |
 
 `node scripts/verify-schema.ts [session_key]` diffs the declared OpenF1 types against real API
 responses and reports missing, extra, nullable and union-typed fields.
@@ -64,6 +65,24 @@ the same models and always runs.
 
 `pnpm smoke` also runs its files one at a time: the rate-limited queue is per module instance,
 so parallel Vitest workers would each claim the full 3 req/s budget and collectively earn a 429.
+
+## Live mode
+
+OpenF1's live feed is a paid subscription, so live timing comes straight from the source F1's
+own timing clients use — for free. That needs a long-lived outbound WebSocket, which a
+serverless deployment cannot hold, so it runs as a separate local process:
+
+```bash
+pnpm bridge            # connect to the feed, serve ws://localhost:8765, record the session
+pnpm bridge:capture 60 # save 60s of raw frames to bridge/fixtures/ for tests to read
+```
+
+Everything it sees is written to `recordings/<session>.jsonl`, so a session that happens once
+can be replayed offline as many times as the analysis needs.
+
+See [bridge/README.md](bridge/README.md) for the handshake, which open-source clients it was
+based on, and the two things most write-ups about this feed get wrong. It is for personal,
+non-commercial use only. OpenF1 remains the source for all historical and replay data.
 
 ## Verified API details
 
