@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# bridge recordings (a session is tens of MB; fixtures are committed, these are not)
+/recordings/

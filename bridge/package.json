@@ -1,0 +1,23 @@
+{
+  "name": "@pit-wall/bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads the F1 live timing SignalR feed and republishes it on a local WebSocket.",
+  "scripts": {
+    "start": "node src/index.ts",
+    "capture": "node src/capture.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.4",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

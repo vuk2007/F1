@@ -1,3 +1,5 @@
 .next
 node_modules
 pnpm-lock.yaml
+bridge/fixtures
+recordings

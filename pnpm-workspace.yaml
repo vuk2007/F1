@@ -1,0 +1,4 @@
+# The web app is the root package; the bridge is a separate process that runs on
+# a laptop during a session and is never part of the Next.js build.
+packages:
+  - bridge

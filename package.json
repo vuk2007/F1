@@ -12,7 +12,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "smoke": "vitest run --config vitest.smoke.mts"
+    "smoke": "vitest run --config vitest.smoke.mts",
+    "bridge": "node bridge/src/index.ts",
+    "bridge:capture": "node bridge/src/capture.ts",
+    "typecheck:bridge": "tsc --noEmit -p bridge"
   },
   "dependencies": {
     "idb": "^8.0.3",

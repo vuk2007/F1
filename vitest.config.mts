@@ -7,6 +7,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    /* The bridge is a separate package, but its pure helpers belong in one suite. */
+    include: ['src/**/*.test.ts', 'bridge/src/**/*.test.ts'],
   },
 });
