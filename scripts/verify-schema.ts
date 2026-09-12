@@ -151,14 +151,37 @@ const EXPECTED: Record<string, string[]> = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Waits out a rate limit rather than failing.
+ *
+ * The 400ms spacing below respects OpenF1's 3 req/s rule, but not its 30/min
+ * rule — and this script shares that budget with anything else on the machine.
+ * Running it straight after the smoke suite reliably earned a 429. The minute
+ * window only clears after a minute, so that is how long a retry waits.
+ */
+const RATE_LIMIT_WAIT_MS = 65_000;
+const MAX_RETRIES = 2;
+
 async function fetchRows(endpoint: string, query: string): Promise<unknown[]> {
   const url = `${BASE}/${endpoint}?${query}`;
-  const response = await fetch(url, { headers: { accept: 'application/json' } });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`${response.status} ${endpoint}: ${text.slice(0, 200)}`);
-  const parsed: unknown = JSON.parse(text);
-  if (!Array.isArray(parsed)) throw new Error(`${endpoint} did not return an array`);
-  return parsed;
+
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(url, { headers: { accept: 'application/json' } });
+    const text = await response.text();
+
+    if (response.status === 429 && attempt < MAX_RETRIES) {
+      console.log(`  rate limited, waiting ${RATE_LIMIT_WAIT_MS / 1000}s before retrying...`);
+      await sleep(RATE_LIMIT_WAIT_MS);
+      continue;
+    }
+    // An empty result set is reported as 404, not as an empty array.
+    if (response.status === 404 && text.includes('No results found')) return [];
+    if (!response.ok) throw new Error(`${response.status} ${endpoint}: ${text.slice(0, 200)}`);
+
+    const parsed: unknown = JSON.parse(text);
+    if (!Array.isArray(parsed)) throw new Error(`${endpoint} did not return an array`);
+    return parsed;
+  }
 }
 
 function report(endpoint: string, rows: unknown[]): boolean {
