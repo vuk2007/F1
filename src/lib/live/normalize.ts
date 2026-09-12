@@ -16,14 +16,18 @@
  * through verbatim rather than mapped, and `cautionPeriods` works on live rows
  * unchanged.
  *
- * **Lap numbering is off by one between topics, and getting it wrong would
- * misalign every lap with its stint.** For car 1 in the capture, the lap that set
- * 1:31.824 is `Lap: 18` in `TimingData.BestLapTime` and in `TimingStats`, but the
- * stint holding that same lap time is labelled `LapNumber: 19`. So
- * `TimingAppData.LapNumber` and `NumberOfLaps` count laps **started**, while
- * `BestLapTime.Lap` counts laps **completed**. Everything here uses the completed
- * numbering, and `completedLapNumber` is the single place that conversion happens.
- * That reading is asserted against the fixture in the tests, for three cars.
+ * **Lap numbers do not mean the same thing in every topic, and getting it wrong
+ * would misalign every lap with its stint.** For car 1 in the capture, the lap that
+ * set 1:31.824 is `Lap: 18` in `TimingData.BestLapTime` and in `TimingStats`, while
+ * the stint holding that same lap time is labelled `LapNumber: 19` — so
+ * `TimingAppData.LapNumber` is the lap counter at the moment the stint record was
+ * last written, one ahead of the lap its `LapTime` refers to. `lapBeforeStintChange`
+ * is the only place that conversion happens, and the tests assert it by finding
+ * each driver's best lap inside the stint that recorded it, for three cars.
+ *
+ * `NumberOfLaps` is deliberately **not** trusted to number a lap. See `lapsFrom`:
+ * the two cars in the capture disagree about whether it counts laps started or laps
+ * completed, so lap rows come only from pairings the feed states outright.
  */
 import type {
   CarData,
@@ -95,12 +99,14 @@ export interface NormalizedRows {
 }
 
 /**
- * The feed counts laps started; OpenF1 numbers laps that finished. Off by one,
- * and only ever converted here.
+ * The last lap completed on a stint, from the lap counter recorded against it.
+ *
+ * `TimingAppData.LapNumber` is where the driver's lap counter stood when that stint
+ * entry was last written, which is one past the last lap actually run on the set.
  */
-function completedLapNumber(lapsStarted: number | undefined): number | null {
-  if (typeof lapsStarted !== 'number' || lapsStarted < 1) return null;
-  return lapsStarted - 1;
+function lapBeforeStintChange(stintLapNumber: number | undefined): number | null {
+  if (typeof stintLapNumber !== 'number' || stintLapNumber < 1) return null;
+  return stintLapNumber - 1;
 }
 
 /** Skips `_kf` and any other non-driver key the feed puts in a Lines object. */
@@ -211,7 +217,7 @@ export function normalizeStints(
 
     feedStints.forEach((stint, index) => {
       const startsAt = index === 0 ? 1 : (feedStints[index - 1]?.LapNumber ?? 1);
-      const endsAt = completedLapNumber(stint.LapNumber);
+      const endsAt = lapBeforeStintChange(stint.LapNumber);
 
       stints.push({
         compound: stint.Compound ?? null,
@@ -261,13 +267,10 @@ export function normalizeStints(
 function sectorTime(sector: FeedSector | undefined): number | null {
   /*
    * `Value` holds the lap in progress and is blanked when the car pits, at which
-   * point `PreviousValue` is the only record of the last real sector. Preferring
-   * Value and falling back keeps a completed lap intact through a pit entry.
+   * point `PreviousValue` is the only record of the last real sector.
    *
-   * This is the least certain read in the file: which of the two holds the lap
-   * that just finished, at the instant `LastLapTime` updates, can only be settled
-   * by watching a live session. Rows are upserted by lap number, so a correction
-   * on the following update overwrites rather than duplicates.
+   * Whichever it comes from, the result is only used if `sectorsMatch` says these
+   * three sectors add up to the lap being described — see `lapsFrom`.
    */
   return parseFeedTime(sector?.Value) ?? parseFeedTime(sector?.PreviousValue);
 }
@@ -278,43 +281,132 @@ function segments(sector: FeedSector | undefined): (number | null)[] | null {
   return list.map((segment) => (typeof segment?.Status === 'number' ? segment.Status : null));
 }
 
-/** A lap row, but only once the feed has a completed lap time to report. */
-function lapFrom(driverNumber: number, line: TimingDataDriver, ctx: NormalizeContext): Lap | null {
-  const lapNumber = completedLapNumber(line.NumberOfLaps);
-  if (lapNumber === null || lapNumber < 1) return null;
+/**
+ * How far the three sectors may be from the lap time and still be that lap's.
+ *
+ * F1 timing reports both to a thousandth and they agree to about that, so this is
+ * generous. It only has to separate "the same lap" from "a different lap", and a
+ * different lap is out by seconds.
+ */
+const SECTOR_SUM_TOLERANCE_S = 0.25;
 
-  const duration = parseFeedTime(line.LastLapTime?.Value);
-  const sectors = line.Sectors ?? [];
+/**
+ * Whether these sectors belong to the lap `duration` describes.
+ *
+ * This check exists because of what a real capture showed. The three `Sectors`
+ * entries are each updated independently as the car crosses them, so they are not
+ * guaranteed to describe the lap `LastLapTime` is reporting. In the captured
+ * session, car 1's sectors add to exactly its `LastLapTime` of 2:10.820 — same lap.
+ * Car 44's add to 115.046 against a `LastLapTime` of 1:32.013, because its next lap
+ * was already part-way through and had overwritten them.
+ *
+ * Taking the sectors on trust put a 1:55 "best lap" on screen for a driver whose
+ * best was 1:32 — which typechecked, passed every unit test, and was obvious the
+ * moment anyone looked at the page.
+ */
+function sectorsMatch(sectors: (number | null)[], duration: number | null): boolean {
+  if (duration === null) return false;
+  if (sectors.some((value) => value === null)) return false;
+  const sum = sectors.reduce((total, value) => total! + value!, 0)!;
+  return Math.abs(sum - duration) <= SECTOR_SUM_TOLERANCE_S;
+}
+
+/**
+ * Lap rows for one driver.
+ *
+ * A snapshot cannot reconstruct a session's lap history, and pretending otherwise
+ * is what produced wrong times on screen. What the feed does give, unambiguously,
+ * is a set of (lap time, lap number) pairs:
+ *
+ *  - `BestLapTimes` — one per qualifying part, each with the lap it was set on.
+ *  - `BestLapTime` — the overall best, with its lap. The only one a race sends.
+ *
+ * Those are always safe: the feed itself states which lap each time belongs to.
+ *
+ * `LastLapTime` is different. It has no lap number of its own, and `NumberOfLaps`
+ * cannot settle it from a snapshot — car 1's counter of 19 agrees with its in-lap
+ * having completed, while car 44's counter of 21 goes with a `LastLapTime` from lap
+ * 20 and a lap 21 that never finished. So the last lap is only emitted when the
+ * sectors corroborate it, which also means it is the only row that carries sectors
+ * and speeds. During live running that is the normal case, because the sectors and
+ * the lap time land together.
+ */
+function lapsFrom(driverNumber: number, line: TimingDataDriver, ctx: NormalizeContext): Lap[] {
+  const atMs = Date.parse(ctx.atIso);
 
   /*
    * The feed does not timestamp a lap's start, so it is derived by counting back
-   * from when the completed time arrived. Good to about the message latency, which
-   * is well inside what the replay clock resolves.
+   * from when the time arrived. For a live session that is right to within the
+   * message latency. For a snapshot of a finished session every lap lands near the
+   * end, which is honest: a snapshot has no history to place them in. The
+   * accumulator keeps the first timestamp a lap was seen with, so a lap does not
+   * creep forward as the session runs.
    */
-  const atMs = Date.parse(ctx.atIso);
-  const startIso =
+  const startedAt = (duration: number | null): string | null =>
     duration !== null && !Number.isNaN(atMs)
       ? new Date(atMs - duration * 1000).toISOString()
       : null;
 
-  return {
-    date_start: startIso,
+  const blank = (lapNumber: number, duration: number | null): Lap => ({
+    date_start: startedAt(duration),
     driver_number: driverNumber,
-    duration_sector_1: sectorTime(sectors[0]),
-    duration_sector_2: sectorTime(sectors[1]),
-    duration_sector_3: sectorTime(sectors[2]),
-    i1_speed: parseFeedNumber(line.Speeds?.I1?.Value),
-    i2_speed: parseFeedNumber(line.Speeds?.I2?.Value),
-    is_pit_out_lap: line.PitOut === true,
+    duration_sector_1: null,
+    duration_sector_2: null,
+    duration_sector_3: null,
+    i1_speed: null,
+    i2_speed: null,
+    is_pit_out_lap: false,
     lap_duration: duration,
     lap_number: lapNumber,
     meeting_key: ctx.meetingKey,
-    segments_sector_1: segments(sectors[0]),
-    segments_sector_2: segments(sectors[1]),
-    segments_sector_3: segments(sectors[2]),
+    segments_sector_1: null,
+    segments_sector_2: null,
+    segments_sector_3: null,
     session_key: ctx.sessionKey,
-    st_speed: parseFeedNumber(line.Speeds?.ST?.Value),
+    st_speed: null,
+  });
+
+  /* Keyed by lap so a best lap that is also the last lap becomes one row. */
+  const byLap = new Map<number, Lap>();
+
+  const addPair = (entry: { Value?: string; Lap?: number } | undefined) => {
+    if (!entry || typeof entry.Lap !== 'number' || entry.Lap < 1) return;
+    const duration = parseFeedTime(entry.Value);
+    if (duration === null) return;
+    byLap.set(entry.Lap, blank(entry.Lap, duration));
   };
+
+  for (const best of line.BestLapTimes ?? []) addPair(best);
+  addPair(line.BestLapTime);
+
+  const lastDuration = parseFeedTime(line.LastLapTime?.Value);
+  const lapNumber = line.NumberOfLaps;
+  if (lastDuration !== null && typeof lapNumber === 'number' && lapNumber >= 1) {
+    const feedSectors = line.Sectors ?? [];
+    const sectors = [
+      sectorTime(feedSectors[0]),
+      sectorTime(feedSectors[1]),
+      sectorTime(feedSectors[2]),
+    ];
+
+    if (sectorsMatch(sectors, lastDuration)) {
+      byLap.set(lapNumber, {
+        ...blank(lapNumber, lastDuration),
+        duration_sector_1: sectors[0]!,
+        duration_sector_2: sectors[1]!,
+        duration_sector_3: sectors[2]!,
+        i1_speed: parseFeedNumber(line.Speeds?.I1?.Value),
+        i2_speed: parseFeedNumber(line.Speeds?.I2?.Value),
+        is_pit_out_lap: line.PitOut === true,
+        segments_sector_1: segments(feedSectors[0]),
+        segments_sector_2: segments(feedSectors[1]),
+        segments_sector_3: segments(feedSectors[2]),
+        st_speed: parseFeedNumber(line.Speeds?.ST?.Value),
+      });
+    }
+  }
+
+  return [...byLap.values()].sort((a, b) => a.lap_number - b.lap_number);
 }
 
 /**
@@ -385,8 +477,7 @@ export function normalizeTiming(
       });
     }
 
-    const lap = lapFrom(driverNumber, line, ctx);
-    if (lap !== null) laps.push(lap);
+    laps.push(...lapsFrom(driverNumber, line, ctx));
   }
 
   return { positions, intervals, laps };
@@ -602,6 +693,33 @@ export function lapCountOf(data: LapCount | undefined): number | null {
 /** Epoch ms of the feed's own clock, when it sends one. */
 export function heartbeatMs(data: { Utc?: string } | undefined): number | null {
   return feedUtcToMs(data?.Utc);
+}
+
+/**
+ * When the rows in a snapshot should be stamped.
+ *
+ * Normally that is the moment it arrived. The exception is a snapshot of a session
+ * that has already ended, which is exactly what the feed sends between events: it
+ * replays the last session's final state to anyone who connects. Stamping that at
+ * connection time put every row nine hours after the chequered flag, stretched the
+ * replay clock to 9:29:13, and labelled the session's final messages as happening
+ * 569 minutes in. The screen was wrong in a way no test had noticed.
+ *
+ * A snapshot of an ended session describes the moment it ended, so it is placed at
+ * the scheduled end. Only snapshots get this: deltas arrive while things happen, so
+ * their arrival time is right even for a session that is ending as we watch.
+ */
+export function snapshotObservedAtIso(nowMs: number, snapshot: Record<string, unknown>): Iso8601 {
+  const status = (snapshot.SessionStatus as SessionStatus | undefined)?.Status?.toLowerCase();
+  /*
+   * "Finished" is deliberately not on the list: it is also what the feed says
+   * between qualifying parts, with the session very much still running.
+   */
+  if (status === 'ends' || status === 'finalised') {
+    const { endMs } = sessionBoundsMs(snapshot.SessionInfo as SessionInfo | undefined);
+    if (endMs !== null && nowMs > endMs) return new Date(endMs).toISOString();
+  }
+  return new Date(nowMs).toISOString();
 }
 
 /**

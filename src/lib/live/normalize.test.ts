@@ -15,6 +15,7 @@ import {
   normalizeTopic,
   normalizeTrackStatus,
   normalizeWeather,
+  snapshotObservedAtIso,
   type NormalizeContext,
 } from './normalize';
 import { parseFeedTime } from './parse';
@@ -198,29 +199,64 @@ describe('normalizeTiming', () => {
     expect(new Set(positions.map((row) => row.position)).size).toBe(positions.length);
   });
 
-  it('numbers a completed lap one behind the feed lap counter', () => {
-    const car1 = laps.find((lap) => lap.driver_number === 1);
-    // NumberOfLaps is 19 laps started, so 18 is the last one completed — the same
-    // lap TimingData reports as the driver's best.
-    expect(car1?.lap_number).toBe(18);
+  it('takes lap numbers only from pairings the feed states outright', () => {
+    /*
+     * Car 1's BestLapTimes name three laps, one per qualifying part, each with the
+     * time set on it. That is the only lap history a snapshot contains, and it is
+     * unambiguous — unlike anything derived from NumberOfLaps.
+     */
+    const car1 = laps.filter((lap) => lap.driver_number === 1);
+
+    // Lap 19 is the in-lap, admitted because its sectors corroborate it below.
+    expect(car1.map((lap) => lap.lap_number)).toEqual([6, 12, 18, 19]);
+    // "1:32.873" parses to 92.87299999…, so durations are compared, not equated.
+    const expected = [93.469, 92.873, 91.824, 130.82];
+    car1.forEach((lap, index) => expect(lap.lap_duration).toBeCloseTo(expected[index]!, 3));
+  });
+
+  it('refuses to number a lap from NumberOfLaps alone', () => {
+    /*
+     * Car 44 completed 21 laps by its own counter, its LastLapTime is its lap-20
+     * best, and its sectors belong to a lap 21 that never finished. There is no
+     * consistent reading, so no lap 21 is invented — only the three stated bests.
+     */
+    const car44 = laps.filter((lap) => lap.driver_number === 44).map((lap) => lap.lap_number);
+
+    expect(car44).toEqual([5, 11, 20]);
   });
 
   it('derives a lap start by counting back from the completed time', () => {
-    const car44 = laps.find((lap) => lap.driver_number === 44);
+    const car44 = laps.find((lap) => lap.driver_number === 44 && lap.lap_number === 20);
     expect(car44?.lap_duration).not.toBeNull();
     expect(Date.parse(car44!.date_start!)).toBe(
       Date.parse(ctx.atIso) - Math.round(car44!.lap_duration! * 1000),
     );
   });
 
-  it('reads sector times and mini-sector segments', () => {
-    const car10 = laps.find((lap) => lap.driver_number === 10);
-    // Car 10 is in the pits, so its sector Values are blank and PreviousValue is
-    // the only record of the lap it just finished.
-    expect(car10?.duration_sector_1).toBeCloseTo(42.798, 3);
-    expect(car10?.duration_sector_2).toBeCloseTo(50.288, 3);
-    expect(car10?.duration_sector_3).toBeCloseTo(41.198, 3);
-    expect(car10?.segments_sector_1).toHaveLength(8);
+  it('keeps sectors when they add up to the lap they are attached to', () => {
+    // Car 1's three sectors sum to exactly its 2:10.820 in-lap, so they are that
+    // lap's and are kept with their mini-sector segments.
+    const inLap = laps.find((lap) => lap.driver_number === 1 && lap.lap_number === 19);
+
+    expect(inLap?.duration_sector_1).toBeCloseTo(43.487, 3);
+    expect(inLap?.duration_sector_2).toBeCloseTo(42.861, 3);
+    expect(inLap?.duration_sector_3).toBeCloseTo(44.472, 3);
+    expect(inLap?.segments_sector_1).toHaveLength(8);
+    expect(inLap?.st_speed).toBeTypeOf('number');
+  });
+
+  it('drops sectors that belong to a different lap', () => {
+    /*
+     * The bug this guard exists for. Car 44's sectors add to 115.046 against a lap
+     * time of 1:32.013, because its next lap had already overwritten them. Taking
+     * them on trust put a 1:55 best lap on screen for a driver whose best was 1:32.
+     */
+    const best = laps.find((lap) => lap.driver_number === 44 && lap.lap_number === 20);
+
+    expect(best?.lap_duration).toBeCloseTo(92.013, 3);
+    expect(best?.duration_sector_1).toBeNull();
+    expect(best?.duration_sector_2).toBeNull();
+    expect(best?.duration_sector_3).toBeNull();
   });
 
   it('reads qualifying gaps out of the part that is running', () => {
@@ -425,6 +461,38 @@ describe('normalizePosition', () => {
     // the track map treats the origin as a missing fix.
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ driver_number: 16, x: 1234, y: -5678, z: 91 });
+  });
+});
+
+describe('snapshotObservedAtIso', () => {
+  const nineHoursLater = Date.parse('2026-09-12T23:29:00.000Z');
+
+  it('places an ended session snapshot at the end of the session, not at connection time', () => {
+    /*
+     * The capture's SessionStatus is "Ends". Stamped at connection time instead, it
+     * stretched the replay clock to 9:29:13 on screen.
+     */
+    expect(snapshotObservedAtIso(nineHoursLater, snapshot as Record<string, unknown>)).toBe(
+      '2026-09-12T15:00:00.000Z',
+    );
+  });
+
+  it('uses arrival time for a session that is still running', () => {
+    const running = { ...snapshot, SessionStatus: { Status: 'Started' } };
+    expect(snapshotObservedAtIso(nineHoursLater, running)).toBe('2026-09-12T23:29:00.000Z');
+  });
+
+  it('does not treat the break between qualifying parts as the end', () => {
+    // "Finished" is also what the feed says after Q1, with Q2 still to come.
+    const betweenParts = { ...snapshot, SessionStatus: { Status: 'Finished' } };
+    expect(snapshotObservedAtIso(nineHoursLater, betweenParts)).toBe('2026-09-12T23:29:00.000Z');
+  });
+
+  it('never moves a time later, only clamps an arrival past the end', () => {
+    const duringSession = Date.parse('2026-09-12T14:30:00.000Z');
+    expect(snapshotObservedAtIso(duringSession, snapshot as Record<string, unknown>)).toBe(
+      '2026-09-12T14:30:00.000Z',
+    );
   });
 });
 

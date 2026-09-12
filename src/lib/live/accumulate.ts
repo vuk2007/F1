@@ -111,6 +111,77 @@ function withinWindow<T extends { date: string; driver_number: number }>(
   });
 }
 
+/**
+ * Folds a second sighting of the same lap into the first.
+ *
+ * Two things make this necessary rather than just replacing the row.
+ *
+ * **A lap is described in pieces.** A best-lap entry states a time and a lap number
+ * and nothing else; the last-lap entry for the same lap carries sectors and trap
+ * speeds. Keeping whichever arrived last would throw away the other half.
+ *
+ * **The first sighting is when the lap happened.** Lap start times are derived by
+ * counting back from arrival, and the feed re-sends a driver's best lap on every
+ * update — so replacing the row each time would drag every best lap forward with
+ * the clock and leave them all looking like they had just been set.
+ */
+function mergeLap(existing: Lap, next: Lap): Lap {
+  const pick = <K extends keyof Lap>(key: K): Lap[K] => {
+    const value = next[key];
+    return value === null || value === undefined ? existing[key] : value;
+  };
+
+  return {
+    ...existing,
+    duration_sector_1: pick('duration_sector_1'),
+    duration_sector_2: pick('duration_sector_2'),
+    duration_sector_3: pick('duration_sector_3'),
+    i1_speed: pick('i1_speed'),
+    i2_speed: pick('i2_speed'),
+    st_speed: pick('st_speed'),
+    segments_sector_1: pick('segments_sector_1'),
+    segments_sector_2: pick('segments_sector_2'),
+    segments_sector_3: pick('segments_sector_3'),
+    lap_duration: pick('lap_duration'),
+    // Once the feed has called a lap a pit-out lap, it stays one.
+    is_pit_out_lap: existing.is_pit_out_lap || next.is_pit_out_lap,
+    // Deliberately the first sighting, not the latest — see above.
+    date_start: existing.date_start ?? next.date_start,
+  };
+}
+
+/**
+ * Stints in app order, with each driver's current stint running up to their latest
+ * lap.
+ *
+ * A stint's end is derived from the lap counter at the last moment its
+ * `TimingAppData` entry was written, so the stint a car is on right now always
+ * trails the car by a lap or more. On screen that left the tyre column blank for
+ * six drivers, whose in-laps had been timed after their final stint record — the
+ * selector looks the tyre up by lap, and those laps belonged to no stint at all.
+ * Only the last stint per driver is extended: every earlier one ended at a real
+ * tyre change, and moving its end would put laps on the wrong set.
+ */
+function extendCurrentStints(stints: Stint[], laps: Iterable<Lap>): Stint[] {
+  const lastLap = new Map<number, number>();
+  for (const lap of laps) {
+    lastLap.set(lap.driver_number, Math.max(lastLap.get(lap.driver_number) ?? 0, lap.lap_number));
+  }
+
+  const sorted = stints.sort(
+    (a, b) => a.driver_number - b.driver_number || a.stint_number - b.stint_number,
+  );
+
+  return sorted.map((stint, index) => {
+    const next = sorted[index + 1];
+    const isCurrent = next === undefined || next.driver_number !== stint.driver_number;
+    const reached = lastLap.get(stint.driver_number);
+    return isCurrent && reached !== undefined && reached > stint.lap_end
+      ? { ...stint, lap_end: reached }
+      : stint;
+  });
+}
+
 /** The keys that identify a row within its collection. */
 const keyOf = {
   driver: (row: Driver) => String(row.driver_number),
@@ -155,7 +226,13 @@ export class DatasetAccumulator {
     if (rows.session) this.#session = rows.session;
 
     for (const driver of rows.drivers ?? []) this.#drivers.set(keyOf.driver(driver), driver);
-    for (const lap of rows.laps ?? []) this.#laps.set(keyOf.lap(lap), lap);
+
+    for (const lap of rows.laps ?? []) {
+      const key = keyOf.lap(lap);
+      const existing = this.#laps.get(key);
+      this.#laps.set(key, existing === undefined ? lap : mergeLap(existing, lap));
+    }
+
     for (const stint of rows.stints ?? []) this.#stints.set(keyOf.stint(stint), stint);
     for (const pit of rows.pits ?? []) this.#pits.set(keyOf.pit(pit), pit);
 
@@ -256,9 +333,7 @@ export class DatasetAccumulator {
       laps: [...this.#laps.values()].sort(
         (a, b) => a.driver_number - b.driver_number || a.lap_number - b.lap_number,
       ),
-      stints: [...this.#stints.values()].sort(
-        (a, b) => a.driver_number - b.driver_number || a.stint_number - b.stint_number,
-      ),
+      stints: extendCurrentStints([...this.#stints.values()], this.#laps.values()),
       pits: [...this.#pits.values()].sort(
         (a, b) => a.driver_number - b.driver_number || a.lap_number - b.lap_number,
       ),

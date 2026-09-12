@@ -123,25 +123,47 @@ describe('a captured session through the whole live path', () => {
 
   it('is accepted by the theoretical best lap model', () => {
     /*
-     * A snapshot carries one completed lap per driver, so the ideal lap is that
-     * lap's own sectors. The point is that the sector times arrived as numbers in
-     * seconds rather than as the feed's "42.798" strings.
+     * Only car 1's in-lap carries sectors in a snapshot — the only lap whose three
+     * sectors add up to its own time — so the ideal lap is that lap's sectors. The
+     * point is that they arrived as seconds, not as the feed's "43.487" strings.
      */
-    const car10 = dataset.laps.filter((lap) => lap.driver_number === 10);
-    const best = theoreticalBestLap(car10);
+    const car1 = dataset.laps.filter((lap) => lap.driver_number === 1);
+    const best = theoreticalBestLap(car1);
 
-    expect(best.theoretical).toBeCloseTo(42.798 + 50.288 + 41.198, 2);
+    expect(best.theoretical).toBeCloseTo(43.487 + 42.861 + 44.472, 2);
   });
 
-  it('holds only completed laps, each inside a stint', () => {
+  it('puts every lap in exactly one stint', () => {
+    /*
+     * Car 1's in-lap was timed after its final stint record was written. It sits in
+     * the current stint only because the accumulator runs that stint up to the
+     * latest lap — which is what put the tyre back in the timing table. None means
+     * a blank tyre column; two means the boundary numbering is wrong.
+     */
     for (const lap of dataset.laps) {
       expect(lap.lap_number).toBeGreaterThan(0);
+      const holding = dataset.stints.filter(
+        (stint) =>
+          stint.driver_number === lap.driver_number &&
+          stint.lap_start <= lap.lap_number &&
+          lap.lap_number <= stint.lap_end,
+      );
+      expect(holding.length, `lap ${lap.lap_number} of car ${lap.driver_number}`).toBe(1);
+    }
+  });
+
+  it('puts every best lap inside the stint that set it', () => {
+    // Best laps are the rows the feed pairs with a lap number outright, so each one
+    // must land in exactly one stint.
+    const bestLaps = dataset.laps.filter((lap) => lap.duration_sector_1 === null);
+    expect(bestLaps.length).toBeGreaterThan(0);
+
+    for (const lap of bestLaps) {
       const stints = dataset.stints.filter((stint) => stint.driver_number === lap.driver_number);
       if (stints.length === 0) continue;
       const holding = stints.filter(
         (stint) => stint.lap_start <= lap.lap_number && lap.lap_number <= stint.lap_end,
       );
-      // A lap outside every stint is the off-by-one this numbering exists to avoid.
       expect(holding.length, `lap ${lap.lap_number} of car ${lap.driver_number}`).toBe(1);
     }
   });

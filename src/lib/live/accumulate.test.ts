@@ -320,6 +320,122 @@ describe('DatasetAccumulator', () => {
     expect(Object.keys(accumulator.build()!)).not.toContain('carData');
   });
 
+  it('keeps the first time a lap was seen, so a re-sent best lap does not creep forward', () => {
+    /*
+     * The feed re-sends each driver's best lap on every timing update. Lap start
+     * times are derived from arrival, so replacing the row each time would leave
+     * every best lap looking as though it had just been set.
+     */
+    const accumulator = started();
+    const best = {
+      date_start: '2026-09-12T14:10:00.000Z',
+      driver_number: 1,
+      duration_sector_1: null,
+      duration_sector_2: null,
+      duration_sector_3: null,
+      i1_speed: null,
+      i2_speed: null,
+      is_pit_out_lap: false,
+      lap_duration: 91.824,
+      lap_number: 18,
+      meeting_key: 1294,
+      segments_sector_1: null,
+      segments_sector_2: null,
+      segments_sector_3: null,
+      session_key: 11365,
+      st_speed: null,
+    };
+
+    accumulator.apply({ laps: [best] });
+    accumulator.apply({ laps: [{ ...best, date_start: '2026-09-12T14:40:00.000Z' }] });
+
+    expect(accumulator.build()!.laps[0]?.date_start).toBe('2026-09-12T14:10:00.000Z');
+  });
+
+  it('combines the pieces of a lap that arrive separately', () => {
+    // A best-lap entry has the time; the last-lap entry has the sectors. Keeping
+    // only the latest would lose one or the other.
+    const accumulator = started();
+    const base = {
+      date_start: '2026-09-12T14:10:00.000Z',
+      driver_number: 1,
+      duration_sector_1: null,
+      duration_sector_2: null,
+      duration_sector_3: null,
+      i1_speed: null,
+      i2_speed: null,
+      is_pit_out_lap: false,
+      lap_duration: 91.824,
+      lap_number: 18,
+      meeting_key: 1294,
+      segments_sector_1: null,
+      segments_sector_2: null,
+      segments_sector_3: null,
+      session_key: 11365,
+      st_speed: 312,
+    };
+
+    accumulator.apply({ laps: [base] });
+    accumulator.apply({
+      laps: [
+        {
+          ...base,
+          date_start: null,
+          duration_sector_1: 30.1,
+          duration_sector_2: 31.2,
+          duration_sector_3: 30.524,
+          st_speed: null,
+        },
+      ],
+    });
+
+    const lap = accumulator.build()!.laps[0]!;
+    expect(lap.duration_sector_2).toBeCloseTo(31.2, 3);
+    // A null in the later piece does not erase what the earlier one knew.
+    expect(lap.st_speed).toBe(312);
+    expect(lap.date_start).toBe('2026-09-12T14:10:00.000Z');
+  });
+
+  it('runs the current stint up to the latest lap, and leaves earlier stints alone', () => {
+    const accumulator = started();
+    const stint = (number: number, start: number, end: number) => ({
+      compound: 'SOFT',
+      driver_number: 1,
+      lap_end: end,
+      lap_start: start,
+      meeting_key: 1294,
+      session_key: 11365,
+      stint_number: number,
+      tyre_age_at_start: 0,
+    });
+    const lap = (lapNumber: number) => ({
+      date_start: null,
+      driver_number: 1,
+      duration_sector_1: null,
+      duration_sector_2: null,
+      duration_sector_3: null,
+      i1_speed: null,
+      i2_speed: null,
+      is_pit_out_lap: false,
+      lap_duration: 92,
+      lap_number: lapNumber,
+      meeting_key: 1294,
+      segments_sector_1: null,
+      segments_sector_2: null,
+      segments_sector_3: null,
+      session_key: 11365,
+      st_speed: null,
+    });
+
+    accumulator.apply({ stints: [stint(1, 1, 3), stint(2, 4, 6)], laps: [lap(2), lap(8)] });
+
+    // Lap 8 was timed after the last stint record; without this it has no tyre.
+    expect(accumulator.build()!.stints.map((s) => [s.lap_start, s.lap_end])).toEqual([
+      [1, 3],
+      [4, 8],
+    ]);
+  });
+
   it('reports what it holds', () => {
     const accumulator = started();
     accumulator.apply({
