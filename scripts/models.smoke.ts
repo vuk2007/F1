@@ -15,6 +15,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { SessionDataset } from '@/lib/openf1/dataset';
 import { loadSessionForSmoke } from './load-or-skip';
 import { cautionPeriods } from '@/lib/models/caution';
+import { buildPaceComparison, paceKey } from '@/lib/models/pace';
 import { estimatePitLoss } from '@/lib/models/pit-loss';
 import { pitWindow } from '@/lib/models/pit-window';
 import {
@@ -192,6 +193,63 @@ describe('undercut on a real race', () => {
      * intercept-based version produced 16s.
      */
     expect(result.marginSeconds).toBeLessThan(12);
+  });
+});
+
+describe('pace comparison on a real race', () => {
+  /** Verstappen won this race; Tsunoda was his team-mate and finished well back. */
+  const TSU = 22;
+
+  it('separates two drivers by a believable margin', () => {
+    const { summaries } = buildPaceComparison(dataset, [VER, TSU]);
+
+    const ver = summaries.find((s) => s.driverNumber === VER)!;
+    const tsu = summaries.find((s) => s.driverNumber === TSU)!;
+
+    // Both did most of the race, so both should have plenty of clean laps.
+    expect(ver.cleanLaps).toBeGreaterThan(25);
+    expect(tsu.cleanLaps).toBeGreaterThan(25);
+
+    // The winner is quicker, but by tenths — not by the twenty seconds a pit
+    // stop would inject if the filtering had failed.
+    expect(ver.medianLap!).toBeLessThan(tsu.medianLap!);
+    expect(tsu.deltaToBest!).toBeGreaterThan(0);
+    expect(tsu.deltaToBest!).toBeLessThan(3);
+    expect(ver.deltaToBest).toBe(0);
+  });
+
+  it('keeps every plotted lap inside racing pace', () => {
+    const { rows, summaries } = buildPaceComparison(dataset, [VER, TSU]);
+    const keys = summaries.map((s) => s.key);
+
+    expect(rows.length).toBeGreaterThan(30);
+    for (const row of rows) {
+      for (const key of keys) {
+        const value = row[key];
+        if (typeof value !== 'number') continue;
+        // A pit or safety car lap leaking through would break these bounds.
+        expect(value).toBeGreaterThan(75);
+        expect(value).toBeLessThan(100);
+      }
+    }
+  });
+
+  it('leaves gaps where a driver pitted rather than bridging them', () => {
+    const { rows } = buildPaceComparison(dataset, [VER]);
+    const laps = rows
+      .filter((row) => typeof row[paceKey(VER)] === 'number')
+      .map((row) => row.lapNumber);
+
+    // Verstappen stopped once, so his plotted laps are not one unbroken run.
+    const missing = laps[laps.length - 1]! - laps[0]! + 1 - laps.length;
+    expect(missing).toBeGreaterThan(0);
+  });
+
+  it('measures deltas against the quickest driver actually selected', () => {
+    const pair = buildPaceComparison(dataset, [TSU, 4]);
+    const references = pair.summaries.filter((s) => s.deltaToBest === 0);
+    // Exactly one driver is the reference, whoever that turns out to be.
+    expect(references).toHaveLength(1);
   });
 });
 

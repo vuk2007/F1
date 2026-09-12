@@ -237,6 +237,13 @@ export const METRICS = {
     reading:
       'Light means fast, dark means slow, and the orange overlay marks where the brake was on. The shape is the driver’s actual line, not an idealised circuit drawing, so it shifts slightly lap to lap. The open circle is where the lap started.',
   },
+  paceComparison: {
+    title: 'Pace comparison',
+    what: 'Clean lap times for several drivers on one chart, with each driver’s median underneath.',
+    why: 'It is the most direct answer to who actually had the pace, rather than who finished ahead.',
+    reading:
+      'Compare the medians, not the fastest laps — a single quick lap can come from clear air or a tow. Gaps in a line are laps that were excluded, so a driver is never made to look slow for pitting. Remember that cars on different tyres or fuel loads are not really comparable.',
+  },
 } as const satisfies Record<string, MetricExplanation>;
 
 export type MetricKey = keyof typeof METRICS;

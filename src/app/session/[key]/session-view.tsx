@@ -7,7 +7,7 @@
  * via useMemo keyed on the replay time.
  */
 import Link from 'next/link';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DriverPanel } from '@/components/DriverPanel';
 import { RaceControlFeed } from '@/components/RaceControlFeed';
 import { ReplayControls } from '@/components/ReplayControls';
@@ -15,11 +15,13 @@ import { StrategyPanel } from '@/components/StrategyPanel';
 import { TimingTable } from '@/components/TimingTable';
 import { WeatherStrip } from '@/components/WeatherStrip';
 import { strings } from '@/lib/i18n/strings';
+import { MAX_PACE_DRIVERS, PaceComparison } from '@/components/PaceComparison';
 import { PracticePanel } from '@/components/PracticePanel';
 import { SafetyCarPanel } from '@/components/SafetyCarPanel';
 import { TelemetryPanel } from '@/components/TelemetryPanel';
 import { UndercutPanel, type UndercutScenario } from '@/components/UndercutPanel';
 import { theoreticalBestLap, theoreticalBestByDriver } from '@/lib/models/best-lap';
+import { buildPaceComparison } from '@/lib/models/pace';
 import { estimatePitLoss } from '@/lib/models/pit-loss';
 import { classifyRuns } from '@/lib/models/runs';
 import { pitWindow } from '@/lib/models/pit-window';
@@ -134,6 +136,39 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
       totalLaps: models.totalLaps,
     };
   }, [dataset, models, selectedDriver]);
+
+  /*
+   * Pace comparison selection. Defaults to the chosen driver and their
+   * team-mate, which is the comparison with the fewest confounds: same car,
+   * same strategy window, usually the same tyres.
+   */
+  const [paceSelection, setPaceSelection] = useState<number[] | null>(null);
+
+  const paceDrivers = useMemo(() => {
+    if (!dataset || !driverAnalysis) return [];
+    if (paceSelection) return paceSelection;
+
+    const me = driverAnalysis.driver;
+    const teamMate = dataset.drivers.find(
+      (d) =>
+        d.team_name != null && d.team_name === me.team_name && d.driver_number !== me.driver_number,
+    );
+    return teamMate ? [me.driver_number, teamMate.driver_number] : [me.driver_number];
+  }, [dataset, driverAnalysis, paceSelection]);
+
+  const pace = useMemo(() => {
+    if (!dataset || paceDrivers.length === 0) return null;
+    return buildPaceComparison(dataset, paceDrivers);
+  }, [dataset, paceDrivers]);
+
+  const togglePaceDriver = (driverNumber: number) => {
+    setPaceSelection((current) => {
+      const base = current ?? paceDrivers;
+      if (base.includes(driverNumber)) return base.filter((n) => n !== driverNumber);
+      if (base.length >= MAX_PACE_DRIVERS) return base;
+      return [...base, driverNumber];
+    });
+  };
 
   /*
    * Practice and qualifying analysis. Independent of the replay clock: a run is
@@ -382,6 +417,16 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
                 ))}
               <DriverPanel driver={driverAnalysis.driver} analyses={driverAnalysis.analyses} />
               <TelemetryPanel dataset={dataset} driver={driverAnalysis.driver} />
+
+              {pace && (
+                <PaceComparison
+                  comparison={pace}
+                  drivers={dataset.drivers.filter((d) => paceDrivers.includes(d.driver_number))}
+                  allDrivers={dataset.drivers}
+                  selected={paceDrivers}
+                  onToggle={togglePaceDriver}
+                />
+              )}
             </>
           ) : (
             <p className="border-border text-muted border-t px-4 py-6 text-sm">

@@ -184,6 +184,14 @@ export const strings = {
       'Distance is integrated from speed and is accurate to about 1%, so it is an estimate rather than a track position.',
   },
 
+  pace: {
+    heading: 'Pace comparison',
+    empty: 'Select drivers to compare their lap times.',
+    fastest: 'fastest',
+    full: (n: number) => `Up to ${n} drivers at once`,
+    note: 'Median of each driver’s representative laps. Pit laps, safety car laps and laps in traffic are excluded, and gaps in a line are those excluded laps.',
+  },
+
   trackMap: {
     heading: 'Track map',
     loading: 'Loading track position...',
