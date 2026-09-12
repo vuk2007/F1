@@ -31,8 +31,11 @@ from two working open-source clients and then verified against the live endpoint
 - **f1-dash** ([github.com/slowlydev/f1-dash](https://github.com/slowlydev/f1-dash))
   — `signalr/src/lib.rs` for the negotiate/handshake/Subscribe sequence and the
   record-separator framing, `realtime/src/services/state_service.rs` for the merge
-  rules in [src/snapshot.ts](src/snapshot.ts), and `realtime/src/f1.rs` for the URL
-  and the topic list in [src/topics.ts](src/topics.ts).
+  rules in [../src/lib/live/feed-state.ts](../src/lib/live/feed-state.ts), and
+  `realtime/src/f1.rs` for the URL and the topic list in
+  [src/topics.ts](src/topics.ts). Its `dashboard/src/types/state.type.ts` is where
+  the raw topic shapes in [../src/lib/live/feed-types.ts](../src/lib/live/feed-types.ts)
+  came from, corrected against the capture wherever the two disagreed.
 - **FastF1** ([github.com/theOehrly/Fast-F1](https://github.com/theOehrly/Fast-F1))
   — `fastf1/livetiming/client.py`, which independently confirms the `/signalrcore`
   endpoint and the `AWSALBCORS` cookie step.
@@ -132,15 +135,44 @@ are better done once here than in every client.
 `subscribeDriver` is currently recorded and not acted on. The obvious use is to
 stop forwarding all twenty cars' telemetry, but `CarData.z` has not been seen from
 a running session yet, and filtering on a guessed shape would drop real data
-silently. It lands with the normalizers.
+silently. It stays inert until a real capture confirms that shape.
+
+## Where the merge lives
+
+The merge rules are in the **app**, at
+[../src/lib/live/feed-state.ts](../src/lib/live/feed-state.ts), and the bridge
+imports them by relative path.
+
+Both sides need them and they have to agree exactly: the bridge merges so it can
+hand a full snapshot to a browser that connects mid-session, and the app merges
+because a recording stores raw deltas rather than merged state. Two copies that
+drifted apart would mean a recording replaying into a different state than the
+live session produced — silent, and miserable to track down. That file imports
+nothing, which is what makes it safe to load from either side.
 
 ## Status
 
 The connection, the snapshot, the recording and the local server are all verified
-against the live endpoint. The normalizers that turn feed topics into the app's
-OpenF1-shaped types are **not written yet** — deliberately, because a session has
-to be captured first. The rule that caught the most bugs in this project was "do
-not invent field names": every normalizer should be written against a fixture from
-`pnpm bridge:capture`, not against an assumption about what the feed looks like.
-The assumptions have already been wrong twice here, about the endpoint and about
-the protocol.
+against the live endpoint.
+
+The normalizers that turn feed topics into the app's OpenF1-shaped types are
+written, in `src/lib/live/`, and tested against the committed fixture — including
+an end-to-end test that pushes a real captured session through merge, normalize
+and accumulate and then runs the app's own selectors and models over the result.
+
+What is **not** verified is everything that only exists while cars are on track:
+
+- `CarData.z` and `Position.z` — their shapes come from f1-dash's types, not from a
+  capture, because an idle feed carries neither topic. The channel numbers
+  (0 RPM, 2 speed, 3 gear, 4 throttle, 5 brake, 45 DRS) are the least certain thing
+  in the whole pipeline.
+- Which of a sector's `Value` and `PreviousValue` holds the lap that just finished,
+  at the instant `LastLapTime` updates.
+- Whether `NumberOfLaps` counts laps started, as three cross-checks in the capture
+  say it does, during a session rather than after one.
+- That deltas merge correctly over hours rather than over one snapshot.
+
+The rule that caught the most bugs in this project was "do not invent field names".
+The assumptions about this feed have already been wrong twice — the endpoint and
+the protocol version — so nothing above should be believed until a session has run
+through it.
