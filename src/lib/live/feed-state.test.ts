@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FeedState, mergeState } from './snapshot.ts';
+import { FeedState, mergeState } from './feed-state';
 
 describe('mergeState', () => {
   it('keeps fields the patch does not mention', () => {

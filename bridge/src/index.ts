@@ -9,7 +9,7 @@
  * every few seconds and no more. That is the feed working, not the bridge failing.
  */
 import { openFeed, type FeedMessage } from './signalr.ts';
-import { FeedState } from './snapshot.ts';
+import { FeedState } from '../../src/lib/live/feed-state.ts';
 import { Recorder, recordingName } from './recorder.ts';
 import { BridgeServer } from './server.ts';
 import { TOPICS } from './topics.ts';
