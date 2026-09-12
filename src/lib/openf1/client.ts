@@ -29,12 +29,50 @@ const queue = new RateLimitedQueue();
 export type QueryValue = string | number | boolean | undefined;
 export type Query = Record<string, QueryValue>;
 
-function buildUrl(endpoint: string, query: Query): string {
-  const params = new URLSearchParams();
+/**
+ * Range-filter suffixes OpenF1 documents. Both end in "=", which doubles as the
+ * key/value separator in the query string.
+ */
+const OPERATORS = ['>=', '<='] as const;
+
+/**
+ * Builds a query string by hand rather than with URLSearchParams.
+ *
+ * OpenF1 expresses range filters as operators inside the key, e.g.
+ * `?date>=2025-09-07T13:43:49Z`. Two things follow, both verified against the
+ * live API:
+ *
+ *  - The operator must stay literal. URLSearchParams encodes it to
+ *    `date%3E%3D`, which returns 404 "No results found" where the raw form
+ *    returns the 317 expected rows.
+ *  - The trailing "=" of the operator IS the separator. The parameter is really
+ *    the key `date>` with the value after it, so no second "=" is added.
+ *
+ * Values are encoded normally; the API accepts either form for those.
+ */
+export function buildQueryString(query: Query): string {
+  const parts: string[] = [];
+
   for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined) params.append(key, String(value));
+    if (value === undefined) continue;
+
+    const encodedValue = encodeURIComponent(String(value));
+    const operator = OPERATORS.find((candidate) => key.endsWith(candidate));
+
+    if (!operator) {
+      parts.push(`${encodeURIComponent(key)}=${encodedValue}`);
+      continue;
+    }
+
+    const field = key.slice(0, -operator.length);
+    parts.push(`${encodeURIComponent(field)}${operator}${encodedValue}`);
   }
-  const qs = params.toString();
+
+  return parts.join('&');
+}
+
+function buildUrl(endpoint: string, query: Query): string {
+  const qs = buildQueryString(query);
   return `${OPENF1_BASE}/${endpoint}${qs ? `?${qs}` : ''}`;
 }
 

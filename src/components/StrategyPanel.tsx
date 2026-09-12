@@ -50,9 +50,14 @@ const dash = strings.common.noValue;
 export function StrategyPanel({
   window: result,
   pitLoss,
+  undercut,
+  safetyCar,
 }: {
   window: PitWindowResult;
   pitLoss: PitLossEstimate;
+  /** Rendered below the pit window figures; supplied by the session view. */
+  undercut?: React.ReactNode;
+  safetyCar?: React.ReactNode;
 }) {
   return (
     <section className="border-border border-t px-4 py-3">
@@ -112,6 +117,9 @@ export function StrategyPanel({
           }
         />
       </div>
+
+      {safetyCar}
+      {undercut}
     </section>
   );
 }

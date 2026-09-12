@@ -92,6 +92,35 @@ export function analyseDriverStints(
     .map((stint) => analyseStint(dataset, driverNumber, stint, { ...options, periods }));
 }
 
+/**
+ * The lap time a car is actually doing right now, expressed as a base for
+ * projections: `lapTime(age) = base + slope * age`.
+ *
+ * Why this exists rather than using the fit's intercept directly. The intercept
+ * is the FUEL-CORRECTED lap time at tyre age zero, and the correction is
+ * anchored to tyre age, not to race lap. Two cars in different stints therefore
+ * sit on different fuel baselines: at Monza a car on lap 45 of its first stint
+ * and a car eight laps into its second are about 37 x 0.055s apart for reasons
+ * that have nothing to do with pace. Comparing intercepts made a car 6.5s behind
+ * project as 16s ahead.
+ *
+ * Subtracting the fuel term at the current age re-anchors the number to the lap
+ * time the car is really setting, which is comparable between cars. Projections
+ * then add each car's own degradation; the fuel both continue to burn is common
+ * to them and cancels in the difference.
+ */
+export function currentPaceBase(analysis: StintAnalysis, tyreAge: number): number | null {
+  const { intercept, fuelEffectPerLap } = analysis.degradation;
+  return intercept == null ? null : intercept - fuelEffectPerLap * tyreAge;
+}
+
+/** The lap time this car is setting right now, on the measured (uncorrected) scale. */
+export function currentPace(analysis: StintAnalysis, tyreAge: number): number | null {
+  const base = currentPaceBase(analysis, tyreAge);
+  if (base == null || analysis.degradation.slope == null) return null;
+  return base + analysis.degradation.slope * tyreAge;
+}
+
 /** The stint covering a lap, from an already-analysed list. */
 export function stintAnalysisForLap(
   analyses: StintAnalysis[],

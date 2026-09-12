@@ -15,9 +15,19 @@ import { StrategyPanel } from '@/components/StrategyPanel';
 import { TimingTable } from '@/components/TimingTable';
 import { WeatherStrip } from '@/components/WeatherStrip';
 import { strings } from '@/lib/i18n/strings';
+import { SafetyCarPanel } from '@/components/SafetyCarPanel';
+import { TelemetryPanel } from '@/components/TelemetryPanel';
+import { UndercutPanel, type UndercutScenario } from '@/components/UndercutPanel';
 import { estimatePitLoss } from '@/lib/models/pit-loss';
 import { pitWindow } from '@/lib/models/pit-window';
-import { analyseDriverStints, stintAnalysisForLap } from '@/lib/models/stint-analysis';
+import { safetyCarOpportunity } from '@/lib/models/safety-car';
+import {
+  analyseDriverStints,
+  currentPaceBase,
+  stintAnalysisForLap,
+  type StintAnalysis,
+} from '@/lib/models/stint-analysis';
+import { undercutSimulation } from '@/lib/models/undercut';
 import { LiveSessionLockoutError } from '@/lib/openf1/client';
 import { loadSession } from '@/lib/openf1/loader';
 import { useReplayClock } from '@/lib/replay/use-replay-clock';
@@ -90,40 +100,167 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
   }, [dataset, timeMs]);
 
   /*
-   * Fitting every stint means a regression per stint, so this is keyed on the
-   * driver and dataset only — never on the clock. Recomputing it per frame
-   * would refit the whole race sixty times a second.
+   * Every driver's stints are fitted once per dataset, never per frame. Twenty
+   * drivers at two or three stints each is a few dozen small regressions, which
+   * is far cheaper than refitting on every clock tick — and the undercut and
+   * safety car panels need rivals' numbers, not just the selected driver's.
    */
+  const models = useMemo(() => {
+    if (!dataset) return null;
+    const analyses = new Map<number, StintAnalysis[]>();
+    for (const driver of dataset.drivers) {
+      analyses.set(driver.driver_number, analyseDriverStints(dataset, driver.driver_number));
+    }
+    return {
+      analyses,
+      pitLoss: estimatePitLoss(dataset),
+      // A completed session's highest lap number is its race distance.
+      totalLaps: dataset.laps.reduce((max, lap) => Math.max(max, lap.lap_number), 0),
+      isRace: dataset.session.session_type === 'Race',
+    };
+  }, [dataset]);
+
   const driverAnalysis = useMemo(() => {
-    if (!dataset || selectedDriver == null) return null;
+    if (!dataset || !models || selectedDriver == null) return null;
     const driver = dataset.drivers.find((d) => d.driver_number === selectedDriver);
     if (!driver) return null;
     return {
       driver,
-      analyses: analyseDriverStints(dataset, selectedDriver),
-      pitLoss: estimatePitLoss(dataset),
-      // A completed session's highest lap number is its race distance.
-      totalLaps: dataset.laps.reduce((max, lap) => Math.max(max, lap.lap_number), 0),
+      analyses: models.analyses.get(selectedDriver) ?? [],
+      pitLoss: models.pitLoss,
+      totalLaps: models.totalLaps,
     };
-  }, [dataset, selectedDriver]);
+  }, [dataset, models, selectedDriver]);
 
-  /* Cheap by comparison, so this one does follow the clock. */
+  /*
+   * The strategy read follows the clock. Each piece is arithmetic over a handful
+   * of laps, so recomputing per frame is cheap now that the fits are cached.
+   */
   const strategy = useMemo(() => {
-    if (!dataset || !driverAnalysis) return null;
-    const lap = currentLapNumber(dataset, driverAnalysis.driver.driver_number, timeMs);
+    if (!dataset || !models || !driverAnalysis || !view) return null;
+    const me = driverAnalysis.driver.driver_number;
+    const lap = currentLapNumber(dataset, me, timeMs);
     if (lap == null) return null;
 
     const current = stintAnalysisForLap(driverAnalysis.analyses, lap);
     if (!current) return null;
 
-    return pitWindow({
+    const myAge = tyreAgeOnLap(current.stint, lap);
+    const window = pitWindow({
       currentLap: lap,
-      totalLaps: driverAnalysis.totalLaps,
-      tyreAge: tyreAgeOnLap(current.stint, lap),
+      totalLaps: models.totalLaps,
+      tyreAge: myAge,
       slope: current.slope,
-      pitLoss: driverAnalysis.pitLoss.seconds,
+      pitLoss: models.pitLoss.seconds,
     });
-  }, [dataset, driverAnalysis, timeMs]);
+
+    /* Neighbours on track come straight from the timing order. */
+    const index = view.rows.findIndex((row) => row.driver.driver_number === me);
+    const aheadRow = index > 0 ? view.rows[index - 1] : undefined;
+    const behindRow = index >= 0 ? view.rows[index + 1] : undefined;
+
+    /*
+     * Builds one undercut scenario: one car stops now, the other responds a lap
+     * later. Both cars are anchored to their current measured pace via
+     * currentPaceBase — see that function for why the fit intercept cannot be
+     * used directly across stints.
+     */
+    const scenario = (
+      rivalRow: typeof aheadRow,
+      rivalIsAhead: boolean,
+    ): UndercutScenario | null => {
+      if (!rivalRow) return null;
+      const rivalNumber = rivalRow.driver.driver_number;
+      const rivalAnalyses = models.analyses.get(rivalNumber) ?? [];
+      const rivalStint = stintAnalysisForLap(rivalAnalyses, lap);
+      if (!rivalStint) return null;
+
+      const rivalAge = tyreAgeOnLap(rivalStint.stint, lap);
+      const mySlope = current.slope;
+      const rivalSlope = rivalStint.slope;
+      const myBase = currentPaceBase(current, myAge);
+      const rivalBase = currentPaceBase(rivalStint, rivalAge);
+      if (mySlope == null || rivalSlope == null || myBase == null || rivalBase == null) return null;
+
+      // Gap is always measured from the car ahead to the car behind.
+      const gap = rivalIsAhead
+        ? (view.rows[index]?.interval.seconds ?? null)
+        : (rivalRow.interval.seconds ?? null);
+      if (gap == null) return null;
+
+      const horizon = Math.min(models.totalLaps, lap + 15);
+
+      const me_ = {
+        label: driverAnalysis.driver.name_acronym,
+        baseLapTime: myBase,
+        slope: mySlope,
+        tyreAge: myAge,
+      };
+      const them = {
+        label: rivalRow.driver.name_acronym,
+        baseLapTime: rivalBase,
+        slope: rivalSlope,
+        tyreAge: rivalAge,
+      };
+
+      // The car behind is the one that launches the undercut.
+      const result = rivalIsAhead
+        ? undercutSimulation({
+            startLap: lap,
+            endLap: horizon,
+            pitLoss: models.pitLoss.seconds,
+            a: { ...them, startDeficit: 0, pitLap: lap + 1 },
+            b: { ...me_, startDeficit: gap, pitLap: lap },
+          })
+        : undercutSimulation({
+            startLap: lap,
+            endLap: horizon,
+            pitLoss: models.pitLoss.seconds,
+            a: { ...me_, startDeficit: 0, pitLap: lap + 1 },
+            b: { ...them, startDeficit: gap, pitLap: lap },
+          });
+
+      return {
+        rival: rivalRow.driver.name_acronym,
+        gap,
+        result,
+        youAhead: result.aheadAtEnd === driverAnalysis.driver.name_acronym,
+      };
+    };
+
+    const caution = safetyCarOpportunity({
+      status: view.status,
+      pitLoss: models.pitLoss.seconds,
+      currentLap: lap,
+      totalLaps: models.totalLaps,
+      drivers: view.rows.flatMap((row) => {
+        const rowLap = row.lapNumber;
+        if (rowLap == null) return [];
+        const stint = stintAnalysisForLap(
+          models.analyses.get(row.driver.driver_number) ?? [],
+          rowLap,
+        );
+        if (!stint) return [];
+        return [
+          {
+            driverNumber: row.driver.driver_number,
+            label: row.driver.name_acronym,
+            tyreAge: tyreAgeOnLap(stint.stint, rowLap),
+            slope: stint.slope,
+            pitCount: row.pitCount,
+            position: row.position,
+          },
+        ];
+      }),
+    });
+
+    return {
+      window,
+      ahead: scenario(aheadRow, true),
+      behind: scenario(behindRow, false),
+      caution,
+    };
+  }, [dataset, models, driverAnalysis, view, timeMs]);
 
   if (status === 'error') {
     return (
@@ -196,7 +333,12 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
           {driverAnalysis ? (
             <>
               {strategy ? (
-                <StrategyPanel window={strategy} pitLoss={driverAnalysis.pitLoss} />
+                <StrategyPanel
+                  window={strategy.window}
+                  pitLoss={driverAnalysis.pitLoss}
+                  undercut={<UndercutPanel ahead={strategy.ahead} behind={strategy.behind} />}
+                  safetyCar={<SafetyCarPanel opportunity={strategy.caution} />}
+                />
               ) : (
                 /* Before the driver's first lap there is no tyre age to reason from. */
                 <p className="border-border text-muted border-t px-4 py-4 text-xs">
@@ -204,6 +346,7 @@ export function SessionView({ sessionKey }: { sessionKey: number }) {
                 </p>
               )}
               <DriverPanel driver={driverAnalysis.driver} analyses={driverAnalysis.analyses} />
+              <TelemetryPanel dataset={dataset} driver={driverAnalysis.driver} />
             </>
           ) : (
             <p className="border-border text-muted border-t px-4 py-6 text-sm">

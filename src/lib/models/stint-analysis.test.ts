@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { SessionDataset } from '@/lib/openf1/dataset';
 import type { Interval, Lap, Stint } from '@/lib/openf1/types';
 import { makeFixture } from '@/lib/replay/fixture';
-import { analyseDriverStints, analyseStint, stintAnalysisForLap } from './stint-analysis';
+import {
+  analyseDriverStints,
+  analyseStint,
+  currentPace,
+  currentPaceBase,
+  stintAnalysisForLap,
+} from './stint-analysis';
 import { defaultFuelEffect, TYPICAL_FUEL_EFFECT_PER_LAP } from './tyre-degradation';
 
 const T0 = Date.parse('2025-01-01T12:00:00.000Z');
@@ -165,6 +171,44 @@ describe('analyseStint', () => {
     expect(result.slope).toBeNull();
     // The raw number is still there for display and debugging.
     expect(result.degradation.slope).not.toBeNull();
+  });
+});
+
+describe('currentPaceBase and currentPace', () => {
+  it('reports the lap time the car is actually setting', () => {
+    // Laps run 90.05 up to 90.50, degrading 0.05 s/lap as measured.
+    const analysis = analyseStint(dataset({}), DRIVER, stint);
+    // At age 10 the measured lap time was 90 + 0.05 * 10 = 90.5.
+    expect(currentPace(analysis, 10)).toBeCloseTo(90.5, 6);
+  });
+
+  it('gives a base that reproduces the measured pace when the slope is added', () => {
+    const analysis = analyseStint(dataset({}), DRIVER, stint);
+    const age = 7;
+    const base = currentPaceBase(analysis, age)!;
+    expect(base + analysis.degradation.slope! * age).toBeCloseTo(currentPace(analysis, age)!, 6);
+  });
+
+  it('differs from the raw intercept by exactly the fuel term', () => {
+    const analysis = analyseStint(dataset({}), DRIVER, stint);
+    const age = 20;
+    const base = currentPaceBase(analysis, age)!;
+    expect(analysis.degradation.intercept! - base).toBeCloseTo(
+      TYPICAL_FUEL_EFFECT_PER_LAP * age,
+      6,
+    );
+  });
+
+  it('matches the intercept when no fuel correction is applied', () => {
+    const analysis = analyseStint(dataset({ sessionType: 'Qualifying' }), DRIVER, stint);
+    expect(currentPaceBase(analysis, 15)).toBeCloseTo(analysis.degradation.intercept!, 6);
+  });
+
+  it('returns null without a usable fit', () => {
+    const short: Stint = { ...stint, lap_end: 2 };
+    const analysis = analyseStint(dataset({ stints: [short] }), DRIVER, short);
+    expect(currentPaceBase(analysis, 5)).toBeNull();
+    expect(currentPace(analysis, 5)).toBeNull();
   });
 });
 

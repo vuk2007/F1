@@ -174,6 +174,34 @@ export const METRICS = {
     reading:
       'Points above the line are laps that lost time; a stint bending upward away from its line is a tyre falling off the cliff. Faded hollow points were excluded from the fit — hover any point to see why. In a race the line often slopes gently downward even though degradation is positive: the car is getting lighter faster than the tyres are wearing out, and the quoted degradation figure has that fuel effect removed.',
   },
+  telemetry: {
+    title: 'Telemetry',
+    what: 'Speed, throttle, brake and gear recorded around one lap, plotted against distance.',
+    why: 'It shows how a lap time was actually produced, corner by corner.',
+    reading:
+      'Plotted against distance rather than time, so the same point on the x-axis is the same point on the track for both cars. Brake is on or off in this data, not a pressure. Distance is integrated from speed and is roughly 1% out.',
+  },
+  telemetryDelta: {
+    title: 'Delta',
+    what: 'Time difference between the two laps at each point on the track.',
+    why: 'It turns two similar-looking traces into an exact answer about where the lap was won.',
+    reading:
+      'Negative means the first driver is ahead. What matters is the slope, not the value: a falling line means the first driver is gaining right there. A step down under braking is a later brake point; a steady drift on a straight is usually engine mode, DRS or slipstream.',
+  },
+  undercut: {
+    title: 'Undercut',
+    what: 'A projection of what happens if the car behind stops first and you respond a lap later.',
+    why: 'It is the most common way track position changes without an overtake.',
+    reading:
+      'The undercut is worth roughly one lap of your current deficit to a fresh tyre. If that is smaller than the gap between you, it cannot work. Watch for the order changing and then changing back — a marginal undercut is often given away again, because the car that stopped early carries a permanently older tyre.',
+  },
+  safetyCar: {
+    title: 'Safety car opportunity',
+    what: 'What a pit stop costs while the field is neutralised, against what it costs under green.',
+    why: 'A caution is the cheapest moment in a race to stop, and the window is seconds long.',
+    reading:
+      'The field slows but the pit lane limit does not, so the stop costs roughly half its normal price. The drivers who gain most are those for whom a stop was not previously worth making and now is. The reduction factors are rules of thumb, not measurements from this session.',
+  },
 } as const satisfies Record<string, MetricExplanation>;
 
 export type MetricKey = keyof typeof METRICS;

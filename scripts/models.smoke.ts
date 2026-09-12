@@ -17,7 +17,15 @@ import { loadSession } from '@/lib/openf1/loader';
 import { cautionPeriods } from '@/lib/models/caution';
 import { estimatePitLoss } from '@/lib/models/pit-loss';
 import { pitWindow } from '@/lib/models/pit-window';
-import { analyseDriverStints, analyseStint } from '@/lib/models/stint-analysis';
+import {
+  analyseDriverStints,
+  analyseStint,
+  currentPace,
+  currentPaceBase,
+  stintAnalysisForLap,
+} from '@/lib/models/stint-analysis';
+import { undercutSimulation } from '@/lib/models/undercut';
+import { tyreAgeOnLap } from '@/lib/replay/selectors';
 import type { StintAnalysis } from '@/lib/models/stint-analysis';
 
 const MONZA_2025_RACE = 9912;
@@ -108,6 +116,82 @@ describe('tyre degradation on a real race', () => {
     for (const analysis of later) {
       expect(analysis.samples[0]!.excluded).toBe('pit-out');
     }
+  });
+});
+
+describe('undercut on a real race', () => {
+  /*
+   * The situation that exposed the fuel-anchoring bug: on lap 45 Verstappen was
+   * 6.45s behind Piastri, on an 8-lap-old hard against Piastri's 45-lap-old
+   * medium. Using the fits' raw intercepts projected Verstappen 16s CLEAR after
+   * both stopped, which is impossible from 6.45s down over eight laps.
+   */
+  const LAP = 45;
+  const PIA = 81;
+
+  function carAt(driverNumber: number) {
+    const analyses = analyseDriverStints(dataset, driverNumber);
+    const stint = stintAnalysisForLap(analyses, LAP);
+    if (!stint) return null;
+    const age = tyreAgeOnLap(stint.stint, LAP);
+    return { stint, age, base: currentPaceBase(stint, age), pace: currentPace(stint, age) };
+  }
+
+  it('anchors both cars to a believable current lap time', () => {
+    const ver = carAt(VER)!;
+    const pia = carAt(PIA)!;
+
+    // Both should be doing something close to a real Monza race lap.
+    for (const car of [ver, pia]) {
+      expect(car.pace).toBeGreaterThan(78);
+      expect(car.pace).toBeLessThan(95);
+    }
+
+    /*
+     * The raw intercepts differ by far more than the cars' actual pace does,
+     * purely because of where each stint sits in the race. This is the trap.
+     */
+    const interceptGap = Math.abs(
+      ver.stint.degradation.intercept! - pia.stint.degradation.intercept!,
+    );
+    const paceGap = Math.abs(ver.pace! - pia.pace!);
+    expect(paceGap).toBeLessThan(interceptGap);
+    expect(paceGap).toBeLessThan(3);
+  });
+
+  it('does not turn a 6s deficit into a 16s lead', () => {
+    const ver = carAt(VER)!;
+    const pia = carAt(PIA)!;
+    const gap = 6.452; // measured interval from the timing feed at this moment
+
+    const result = undercutSimulation({
+      startLap: LAP,
+      endLap: Math.min(53, LAP + 8),
+      pitLoss: estimatePitLoss(dataset).seconds,
+      a: {
+        label: 'PIA',
+        startDeficit: 0,
+        baseLapTime: pia.base!,
+        slope: pia.stint.slope!,
+        tyreAge: pia.age,
+        pitLap: LAP + 1,
+      },
+      b: {
+        label: 'VER',
+        startDeficit: gap,
+        baseLapTime: ver.base!,
+        slope: ver.stint.slope!,
+        tyreAge: ver.age,
+        pitLap: LAP,
+      },
+    });
+
+    /*
+     * Verstappen genuinely gains here — Piastri is on a 45-lap-old medium — but
+     * the swing over eight laps has to stay in the realm of physics. The old
+     * intercept-based version produced 16s.
+     */
+    expect(result.marginSeconds).toBeLessThan(12);
   });
 });
 
