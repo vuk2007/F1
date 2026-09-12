@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+
+/*
+ * Pit Wall deliberately commits to a single dark look: this is a timing screen,
+ * and a light variant would hurt the purple/green/yellow sector colours that
+ * carry meaning.
+ */
+:root {
+  --background: #0b0d10;
+  --surface: #14181d;
+  --surface-2: #1b2027;
+  --border: #262c35;
+  --foreground: #e8ecf1;
+  --muted: #8b96a5;
+
+  --purple: #b14cff;
+  --green: #21c95b;
+  --yellow: #e8d44d;
+  --red: #e5232a;
+  --accent: #3ea6ff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-sector-purple: var(--purple);
+  --color-sector-green: var(--green);
+  --color-sector-yellow: var(--yellow);
+  --color-danger: var(--red);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Timing figures must line up column to column; tabular figures do that. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
