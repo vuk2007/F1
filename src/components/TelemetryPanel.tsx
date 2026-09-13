@@ -10,6 +10,7 @@
 import { memo, useMemo, useState } from 'react';
 import { formatLapTime } from '@/lib/format';
 import { strings } from '@/lib/i18n/strings';
+import { telemetryCaption } from '@/lib/explain/captions';
 import { buildComparison, fullThrottleShare, topSpeed } from '@/lib/models/telemetry';
 import type { SessionDataset } from '@/lib/openf1/dataset';
 import type { Driver } from '@/lib/openf1/types';
@@ -34,7 +35,16 @@ function fastestLapNumber(dataset: SessionDataset, driverNumber: number): number
   return best?.lap ?? null;
 }
 
-function TelemetryPanelInner({ dataset, driver }: { dataset: SessionDataset; driver: Driver }) {
+function TelemetryPanelInner({
+  dataset,
+  driver,
+  showCaption = false,
+}: {
+  dataset: SessionDataset;
+  driver: Driver;
+  /** Adds a plain-language reading under the charts; Simple mode only. */
+  showCaption?: boolean;
+}) {
   const laps = useMemo(() => timedLaps(dataset, driver.driver_number), [dataset, driver]);
   const defaultLap = useMemo(
     () => fastestLapNumber(dataset, driver.driver_number),
@@ -64,6 +74,16 @@ function TelemetryPanelInner({ dataset, driver }: { dataset: SessionDataset; dri
   const throttleShare = fullThrottleShare(primary.points);
   const compareDriver = dataset.drivers.find((d) => d.driver_number === compareWith) ?? null;
   const selectedLap = laps.find((lap) => lap.lap_number === lapNumber);
+
+  const caption = showCaption
+    ? telemetryCaption({
+        labelA: driver.name_acronym,
+        labelB: compareDriver && !secondary.loading ? compareDriver.name_acronym : null,
+        deltas: rows.map((row) => row.delta),
+        topSpeed: peak?.speed ?? null,
+        fullThrottle: throttleShare,
+      })
+    : null;
 
   return (
     <section className="border-border border-t px-4 py-3">
@@ -158,6 +178,7 @@ function TelemetryPanelInner({ dataset, driver }: { dataset: SessionDataset; dri
               />
             </div>
           </div>
+          {caption && <p className="text-foreground/80 mt-2 text-xs leading-relaxed">{caption}</p>}
         </>
       )}
     </section>

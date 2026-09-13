@@ -83,7 +83,16 @@ function StintRow({ analysis }: { analysis: StintAnalysis }) {
   );
 }
 
-function DriverPanelInner({ driver, analyses }: { driver: Driver; analyses: StintAnalysis[] }) {
+function DriverPanelInner({
+  driver,
+  analyses,
+  caption,
+}: {
+  driver: Driver;
+  analyses: StintAnalysis[];
+  /** Plain-language reading of the lap chart, shown in Simple mode only. */
+  caption?: string | null;
+}) {
   return (
     <section className="border-border border-t">
       <header className="border-border flex items-center gap-2 border-b px-4 py-2.5">
@@ -102,6 +111,7 @@ function DriverPanelInner({ driver, analyses }: { driver: Driver; analyses: Stin
           <InfoTip metric="lapChart" />
         </h3>
         <LapChart analyses={analyses} />
+        {caption && <p className="text-foreground/80 mt-1 text-xs leading-relaxed">{caption}</p>}
       </div>
 
       <div className="px-4 pb-4">

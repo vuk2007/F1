@@ -14,6 +14,17 @@ import { ReplayControls } from '@/components/ReplayControls';
 import { StrategyPanel } from '@/components/StrategyPanel';
 import { TimingTable } from '@/components/TimingTable';
 import { WeatherStrip } from '@/components/WeatherStrip';
+import { DriverCards } from '@/components/simple/DriverCards';
+import { KeyBattles } from '@/components/simple/KeyBattles';
+import { Onboarding } from '@/components/simple/Onboarding';
+import { RaceStoryStrip } from '@/components/simple/RaceStoryStrip';
+import { RightNowBanner } from '@/components/simple/RightNowBanner';
+import { ViewModeToggle } from '@/components/simple/ViewModeToggle';
+import { lapChartCaption, paceCaption } from '@/lib/explain/captions';
+import { driverBadges, driverStatusLine } from '@/lib/explain/driver-card';
+import { openInvestigations } from '@/lib/explain/investigations';
+import { flagChip, lapProgress, weatherInWords } from '@/lib/explain/race-story';
+import { rightNow } from '@/lib/explain/right-now';
 import { strings } from '@/lib/i18n/strings';
 import { MAX_PACE_DRIVERS, PaceComparison } from '@/components/PaceComparison';
 import { PracticePanel } from '@/components/PracticePanel';
@@ -25,6 +36,7 @@ import { buildPaceComparison } from '@/lib/models/pace';
 import { estimatePitLoss } from '@/lib/models/pit-loss';
 import { classifyRuns } from '@/lib/models/runs';
 import { pitWindow } from '@/lib/models/pit-window';
+import { raceDistance } from '@/lib/models/race-distance';
 import { safetyCarOpportunity } from '@/lib/models/safety-car';
 import {
   analyseDriverStints,
@@ -45,7 +57,9 @@ import {
   tyreAgeOnLap,
   weatherAt,
 } from '@/lib/replay/selectors';
+import { driversInPitLane, keyBattles } from '@/lib/replay/battles';
 import { useSessionStore } from '@/lib/store/session-store';
+import { useViewPrefs } from '@/lib/store/view-prefs';
 
 /**
  * `openf1` downloads a session by key. `live` expects something else to be filling
@@ -79,6 +93,7 @@ export function SessionView({
   const timeMs = useSessionStore((s) => s.timeMs);
   const selectedDriver = useSessionStore((s) => s.selectedDriver);
   const selectDriver = useSessionStore((s) => s.selectDriver);
+  const viewMode = useViewPrefs((s) => s.mode);
 
   useReplayClock();
 
@@ -145,8 +160,8 @@ export function SessionView({
     return {
       analyses,
       pitLoss: estimatePitLoss(dataset),
-      // A completed session's highest lap number is its race distance.
-      totalLaps: dataset.laps.reduce((max, lap) => Math.max(max, lap.lap_number), 0),
+      // Not the highest lap in the data: timing continues past the flag. See raceDistance.
+      totalLaps: raceDistance(dataset),
       isRace: dataset.session.session_type === 'Race',
     };
   }, [dataset]);
@@ -361,6 +376,91 @@ export function SessionView({
     };
   }, [dataset, models, driverAnalysis, view, timeMs]);
 
+  /*
+   * The Simple view: everything a newcomer sees above the detail panels. Computed
+   * only in that mode, so Engineer pays nothing for it. Per-driver pit verdicts are
+   * arithmetic over the fits already cached in `models`, cheap enough per frame.
+   */
+  const simple = useMemo(() => {
+    if (viewMode !== 'simple' || !dataset || !models || !view) return null;
+    const { isRace } = models;
+
+    const sessionBestLap = view.rows.reduce<number | null>(
+      (best, row) =>
+        row.bestLap == null ? best : best == null ? row.bestLap : Math.min(best, row.bestLap),
+      null,
+    );
+    // The feed is newest first; investigations are opened and closed in order.
+    const investigated = new Set(openInvestigations([...view.messages].reverse()));
+    const battles = keyBattles(dataset, view.rows, timeMs);
+    const acronym = new Map(dataset.drivers.map((d) => [d.driver_number, d.name_acronym]));
+
+    const cards = view.rows.map((row, index) => {
+      const lap = row.lapNumber;
+      const stint =
+        lap == null
+          ? undefined
+          : stintAnalysisForLap(models.analyses.get(row.driver.driver_number) ?? [], lap);
+      const pitVerdict =
+        isRace && lap != null && stint && row.tyre.age != null
+          ? pitWindow({
+              currentLap: lap,
+              totalLaps: models.totalLaps,
+              tyreAge: row.tyre.age,
+              slope: stint.slope,
+              pitLoss: models.pitLoss.seconds,
+            }).verdict
+          : null;
+
+      return {
+        row,
+        statusLine: driverStatusLine(row, { isRace, sessionBestLap }),
+        badges: driverBadges({
+          row,
+          behind: view.rows[index + 1],
+          isRace,
+          status: view.status,
+          sessionBestLap,
+          underInvestigation: investigated.has(row.driver.driver_number),
+          pitVerdict,
+          slope: stint?.slope ?? null,
+        }),
+      };
+    });
+
+    return {
+      cards,
+      battles,
+      rightNow: rightNow({
+        rows: view.rows,
+        status: view.status,
+        weather: view.weather,
+        lap: view.lap,
+        totalLaps: models.totalLaps,
+        isRace,
+        inPitLane: driversInPitLane(dataset, timeMs).map((n) => acronym.get(n) ?? String(n)),
+        battles,
+      }),
+      progress: lapProgress(view.lap, models.totalLaps, isRace),
+      flag: flagChip(view.status),
+      weather: weatherInWords(view.weather),
+    };
+  }, [viewMode, dataset, models, view, timeMs]);
+
+  /* Chart captions depend on the selection, not the clock. */
+  const captions = useMemo(() => {
+    if (viewMode !== 'simple' || !dataset) return null;
+    return {
+      lapChart: driverAnalysis ? lapChartCaption(driverAnalysis.analyses) : null,
+      pace: pace
+        ? paceCaption(
+            pace.summaries,
+            (n) => dataset.drivers.find((d) => d.driver_number === n)?.name_acronym ?? String(n),
+          )
+        : null,
+    };
+  }, [viewMode, dataset, driverAnalysis, pace]);
+
   if (status === 'error') {
     return (
       <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-16">
@@ -414,9 +514,12 @@ export function SessionView({
           </h1>
           <p className="text-muted text-xs">{session.circuit_short_name}</p>
         </div>
-        <Link href="/" className="text-accent text-xs hover:underline">
-          {strings.load.backToPicker}
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          <ViewModeToggle />
+          <Link href="/" className="text-accent text-xs hover:underline">
+            {strings.load.backToPicker}
+          </Link>
+        </div>
       </header>
 
       {statusBar}
@@ -427,15 +530,34 @@ export function SessionView({
         lap={view.lap}
         trackStatus={view.status}
       />
-      <WeatherStrip weather={view.weather} />
+      {simple ? (
+        <>
+          <RightNowBanner kind={simple.rightNow.kind} sentence={simple.rightNow.sentence} />
+          <RaceStoryStrip progress={simple.progress} flag={simple.flag} weather={simple.weather} />
+        </>
+      ) : (
+        <WeatherStrip weather={view.weather} />
+      )}
 
       <div className="flex flex-1 flex-col lg:flex-row">
         <section className="min-w-0 flex-1">
-          <TimingTable
-            rows={view.rows}
-            selectedDriver={selectedDriver}
-            onSelectDriver={selectDriver}
-          />
+          {simple ? (
+            <>
+              <DriverCards
+                cards={simple.cards}
+                selectedDriver={selectedDriver}
+                onSelectDriver={selectDriver}
+              />
+              {/* Outside a race the order is by best lap, so nobody is fighting anybody. */}
+              {models?.isRace && <KeyBattles battles={simple.battles} />}
+            </>
+          ) : (
+            <TimingTable
+              rows={view.rows}
+              selectedDriver={selectedDriver}
+              onSelectDriver={selectDriver}
+            />
+          )}
 
           {driverAnalysis ? (
             <>
@@ -462,11 +584,20 @@ export function SessionView({
                     {strings.strategy.notStarted}
                   </p>
                 ))}
-              <DriverPanel driver={driverAnalysis.driver} analyses={driverAnalysis.analyses} />
-              <TelemetryPanel dataset={dataset} driver={driverAnalysis.driver} />
+              <DriverPanel
+                driver={driverAnalysis.driver}
+                analyses={driverAnalysis.analyses}
+                caption={captions?.lapChart}
+              />
+              <TelemetryPanel
+                dataset={dataset}
+                driver={driverAnalysis.driver}
+                showCaption={simple != null}
+              />
 
               {pace && (
                 <PaceComparison
+                  caption={captions?.pace}
                   comparison={pace}
                   drivers={paceDriverRows}
                   allDrivers={dataset.drivers}
@@ -477,7 +608,7 @@ export function SessionView({
             </>
           ) : (
             <p className="border-border text-muted border-t px-4 py-6 text-sm">
-              {strings.driver.selectPrompt}
+              {simple ? strings.simple.cards.tapHint : strings.driver.selectPrompt}
             </p>
           )}
         </section>
@@ -485,6 +616,8 @@ export function SessionView({
           <RaceControlFeed messages={view.messages} sessionStartMs={dataset.startMs} />
         </aside>
       </div>
+
+      {simple && <Onboarding />}
     </main>
   );
 }

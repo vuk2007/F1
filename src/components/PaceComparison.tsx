@@ -46,7 +46,10 @@ function PaceComparisonInner({
   allDrivers,
   selected,
   onToggle,
+  caption,
 }: {
+  /** Plain-language reading of the chart, shown in Simple mode only. */
+  caption?: string | null;
   comparison: Comparison;
   /** Drivers in the comparison, in series order. */
   drivers: Driver[];
@@ -167,6 +170,7 @@ function PaceComparisonInner({
               </LineChart>
             </ResponsiveContainer>
           </div>
+          {caption && <p className="text-foreground/80 mt-1 text-xs leading-relaxed">{caption}</p>}
 
           {/*
             This list is the legend: swatch, driver, median, delta and lap count
