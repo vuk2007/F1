@@ -171,6 +171,22 @@ export type RaceControlFlag = Open<
   'GREEN' | 'YELLOW' | 'DOUBLE YELLOW' | 'RED' | 'CHEQUERED' | 'CLEAR' | 'BLACK AND WHITE'
 >;
 
+/**
+ * `/overtakes`: every position exchange OpenF1 detected, including those from pit
+ * stops, the start and restarts — so it is only ever used together with the
+ * position and pit data, never as a count of on-track passes by itself. Verified
+ * against Monza 2026 (session 11361): 334 rows.
+ */
+export interface Overtake {
+  meeting_key: number;
+  session_key: number;
+  overtaking_driver_number: number;
+  overtaken_driver_number: number;
+  date: Iso8601;
+  /** The position the overtaking driver took. */
+  position: number;
+}
+
 export interface RaceControl {
   category: RaceControlCategory;
   date: Iso8601;

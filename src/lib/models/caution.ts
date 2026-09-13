@@ -17,6 +17,52 @@ export interface CautionPeriod {
   endMs: number | null;
 }
 
+/**
+ * What one race control message says about the track, or null when it says nothing.
+ *
+ * The wording changed in 2026, verified across every 2024-2026 race in the
+ * calibration cache: the virtual safety car went from "VIRTUAL SAFETY CAR DEPLOYED /
+ * ENDING" to "VSC DEPLOYED / ENDING" (24 and 23 times in 2026, never before), and a
+ * red flag can arrive as a plain "RED FLAG - RACE SUSPENDED" with no flag or scope
+ * (3 times in 2026). Matching only the old wording read Monza 2026's lap-3 safety car
+ * as lasting until a VSC ended 26 laps later, and threw away every lap in between.
+ * `cautionPeriods` and `trackStatusAt` both read the feed through this one function,
+ * so the prediction models and the flag on screen cannot disagree.
+ */
+export type ControlSignal =
+  | 'sc-start'
+  | 'vsc-start'
+  | 'caution-end'
+  | 'red'
+  | 'green'
+  | 'yellow'
+  | 'chequered';
+
+export function controlSignal(message: RaceControl): ControlSignal | null {
+  const text = message.message.toUpperCase();
+
+  if (message.category === 'SafetyCar') {
+    const isVirtual = text.includes('VIRTUAL SAFETY CAR') || /\bVSC\b/.test(text);
+    if (text.includes('DEPLOYED')) return isVirtual ? 'vsc-start' : 'sc-start';
+    if (text.includes('ENDING') || text.includes('WITHDRAWN') || text.includes('IN THIS LAP')) {
+      return 'caution-end';
+    }
+    return null;
+  }
+
+  // A prefix, so "INCIDENT ... NOTED - RED FLAG INFRINGEMENT" is not a red flag.
+  if ((message.scope === 'Track' && message.flag === 'RED') || /^RED FLAG\b/.test(text)) {
+    return 'red';
+  }
+
+  if (message.scope === 'Track') {
+    if (message.flag === 'CHEQUERED') return 'chequered';
+    if (message.flag === 'GREEN' || message.flag === 'CLEAR') return 'green';
+    if (message.flag === 'YELLOW' || message.flag === 'DOUBLE YELLOW') return 'yellow';
+  }
+  return null;
+}
+
 interface OpenPeriod {
   kind: CautionKind;
   startMs: number;
@@ -44,33 +90,18 @@ export function cautionPeriods(raceControl: RaceControl[]): CautionPeriod[] {
   };
 
   for (const { message, t } of sorted) {
-    const text = message.message.toUpperCase();
+    const signal = controlSignal(message);
 
-    if (message.category === 'SafetyCar') {
-      const isVirtual = text.includes('VIRTUAL SAFETY CAR');
-      const kind: CautionKind = isVirtual ? 'vsc' : 'sc';
-
-      if (text.includes('DEPLOYED')) {
-        if (open && open.kind !== kind) close(t);
-        if (!open) open = { kind, startMs: t };
-      } else if (
-        text.includes('ENDING') ||
-        text.includes('WITHDRAWN') ||
-        text.includes('IN THIS LAP')
-      ) {
-        close(t);
-      }
-      continue;
-    }
-
-    if (message.scope === 'Track' && message.flag === 'RED') {
+    if (signal === 'sc-start' || signal === 'vsc-start') {
+      const kind: CautionKind = signal === 'vsc-start' ? 'vsc' : 'sc';
+      if (open && open.kind !== kind) close(t);
+      if (!open) open = { kind, startMs: t };
+    } else if (signal === 'caution-end') {
+      close(t);
+    } else if (signal === 'red') {
       if (open && open.kind !== 'red') close(t);
       if (!open) open = { kind: 'red', startMs: t };
-    } else if (
-      message.scope === 'Track' &&
-      (message.flag === 'GREEN' || message.flag === 'CLEAR') &&
-      open?.kind === 'red'
-    ) {
+    } else if (signal === 'green' && open?.kind === 'red') {
       close(t);
     }
   }

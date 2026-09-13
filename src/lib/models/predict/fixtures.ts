@@ -14,7 +14,12 @@ export type FixtureName =
   | 'zandvoort-2025-race'
   | 'bahrain-2025-fp2'
   | 'bahrain-2025-fp3'
-  | 'bahrain-2025-qualifying';
+  | 'bahrain-2025-qualifying'
+  | 'monza-2026-race'
+  | 'miami-2026-race'
+  | 'monza-2026-fp2'
+  | 'monza-2026-fp3'
+  | 'monza-2026-qualifying';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '__fixtures__');
 const cache = new Map<FixtureName, SessionDataset>();

@@ -8,6 +8,7 @@
 import type { SessionDataset } from '@/lib/openf1/dataset';
 import type { Driver, Gap, Lap, RaceControl, Stint, Weather } from '@/lib/openf1/types';
 import { getReplayIndex, type CompletedLap, type RunningBests } from './index-build';
+import { controlSignal } from '@/lib/models/caution';
 import { lastIndexAtOrBefore, valueAt, valuesUntil } from './timeline';
 
 /** Float comparison tolerance for "is this the same lap/sector time". */
@@ -133,24 +134,31 @@ export function trackStatusAt(dataset: SessionDataset, timeMs: number): TrackSta
   const index = getReplayIndex(dataset);
   const messages = valuesUntil(index.raceControl, timeMs);
 
+  /* Read through the same classifier as the caution periods; see `controlSignal`. */
   let status: TrackStatus = 'unknown';
   for (const message of messages) {
-    const text = message.message.toUpperCase();
-    if (message.category === 'SafetyCar') {
-      if (text.includes('VIRTUAL SAFETY CAR')) {
-        if (text.includes('DEPLOYED')) status = 'vsc';
-        else if (text.includes('ENDING') || text.includes('WITHDRAWN')) status = 'green';
-      } else if (text.includes('SAFETY CAR')) {
-        if (text.includes('DEPLOYED')) status = 'sc';
-        else if (text.includes('IN THIS LAP') || text.includes('WITHDRAWN')) status = 'green';
-      }
-      continue;
-    }
-    if (message.flag && message.scope === 'Track') {
-      if (message.flag === 'RED') status = 'red';
-      else if (message.flag === 'CHEQUERED') status = 'chequered';
-      else if (message.flag === 'GREEN' || message.flag === 'CLEAR') status = 'green';
-      else if (message.flag === 'YELLOW' || message.flag === 'DOUBLE YELLOW') status = 'yellow';
+    switch (controlSignal(message)) {
+      case 'sc-start':
+        status = 'sc';
+        break;
+      case 'vsc-start':
+        status = 'vsc';
+        break;
+      case 'caution-end':
+      case 'green':
+        status = 'green';
+        break;
+      case 'red':
+        status = 'red';
+        break;
+      case 'yellow':
+        status = 'yellow';
+        break;
+      case 'chequered':
+        status = 'chequered';
+        break;
+      default:
+        break;
     }
   }
   return status;
