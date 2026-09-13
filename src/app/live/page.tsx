@@ -21,10 +21,36 @@ import { useLiveSource } from '@/lib/live/use-live-source';
 import { loadRecordingFile } from '@/lib/replay/recordingSource';
 import { useSessionStore } from '@/lib/store/session-store';
 
+/**
+ * `?bridge=wss://...` points the page at a bridge reached over the internet, through
+ * a tunnel, instead of `ws://localhost:8765`.
+ *
+ * The deployed site needs it: Chrome will not let a public https page open a socket
+ * to localhost. Tried on race day with Chrome 152, the connection from the Vercel
+ * page stayed pending with no error even with local network access granted, while
+ * the same socket from http://localhost:3000 opened at once. Only ws: and wss: are
+ * accepted, so the parameter cannot point the page anywhere else.
+ */
+function bridgeUrlFromLocation(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const value = new URLSearchParams(window.location.search).get('bridge');
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'ws:' || url.protocol === 'wss:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function LivePage() {
   const [recordingActive, setRecordingActive] = useState(false);
   const [recordingNote, setRecordingNote] = useState<string | null>(null);
-  const { state, following, jumpToLive } = useLiveSource({ enabled: !recordingActive });
+  const [bridgeUrl] = useState(bridgeUrlFromLocation);
+  const { state, following, jumpToLive } = useLiveSource({
+    url: bridgeUrl,
+    enabled: !recordingActive,
+  });
 
   const openRecording = useCallback((file: File) => {
     setRecordingNote(null);
