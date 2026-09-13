@@ -6,8 +6,10 @@
  * prediction that already knows the answer.
  */
 import type { SessionDataset } from '@/lib/openf1/dataset';
+import { overtakeModeEnabledAt, overtakeModeNextLap } from '@/lib/replay/overtake-mode';
 import { trackStatusAt } from '@/lib/replay/selectors';
 import { toTimed, valueAt } from '@/lib/replay/timeline';
+import { regulationsFor, type Regulations } from '@/lib/season';
 import { raceDistance } from '../race-distance';
 import { battleForecast, type BattleForecast, type CarPace } from './battle-forecast';
 import { cheapStop, type CheapStop } from './cheap-stop';
@@ -52,6 +54,11 @@ export interface BattlePrediction {
   gap: number;
   forecast: BattleForecast;
   overtake: { probability: number | null; confidence: Confidence; enough: boolean };
+  /**
+   * 2026 only: whether the chaser has Overtake Mode next lap, from the gap now and
+   * race control's switch. Null before 2026, or when race control has not said.
+   */
+  overtakeModeNextLap: boolean | null;
 }
 
 export interface DriverPredictions {
@@ -66,6 +73,8 @@ export interface DriverPredictions {
 
 export interface RacePredictions {
   kind: 'race';
+  /** DRS up to 2025, Overtake Mode from 2026: decides what the cards call the aid. */
+  regulations: Regulations;
   lap: number | null;
   totalLaps: number;
   pitLoss: LivePitLoss;
@@ -77,6 +86,7 @@ export interface RacePredictions {
 
 export interface PracticePredictions {
   kind: 'practice';
+  regulations: Regulations;
   degradation: PracticeCompoundDegradation[];
   /** Only in practice 3, where the forecast is meant to be read. */
   q3: Q3CutoffForecast | null;
@@ -112,12 +122,14 @@ export function buildPredictions(input: {
 }): RacePredictions | PracticePredictions {
   const { dataset, timeMs, selectedDriver, rivalDriver, calibration } = input;
   const snapshot = snapshotAt(dataset, timeMs);
+  const regulations = regulationsFor(dataset.session.year);
   const label = (n: number) =>
     dataset.drivers.find((d) => d.driver_number === n)?.name_acronym ?? String(n);
 
   if (dataset.session.session_type !== 'Race') {
     return {
       kind: 'practice',
+      regulations,
       degradation: practiceDegradation(snapshot),
       q3:
         dataset.session.session_name === 'Practice 3'
@@ -136,6 +148,8 @@ export function buildPredictions(input: {
   );
   const pitLoss = livePitLoss(snapshot);
   const intervals = new IntervalLookup(snapshot.intervals);
+  const overtakeModeOn =
+    regulations === 'overtake-mode' ? overtakeModeEnabledAt(snapshot.raceControl, timeMs) : null;
 
   const positionSeries = new Map(
     dataset.drivers.map((d) => [
@@ -245,6 +259,8 @@ export function buildPredictions(input: {
               enough: true,
             }
           : { probability: null, confidence: 'low', enough: false },
+      overtakeModeNextLap:
+        regulations === 'overtake-mode' ? overtakeModeNextLap(gap, overtakeModeOn) : null,
     });
   }
   battles.sort((a, b) => a.gap - b.gap);
@@ -329,6 +345,7 @@ export function buildPredictions(input: {
 
   return {
     kind: 'race',
+    regulations,
     lap,
     totalLaps,
     pitLoss,

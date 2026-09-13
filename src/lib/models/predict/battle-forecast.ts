@@ -1,6 +1,7 @@
 /**
- * Card 4 — battle forecast: how many laps until the chasing car is within DRS
- * range of the car ahead.
+ * Card 4 — battle forecast: how many laps until the chasing car is within one
+ * second of the car ahead — DRS range up to 2025, Overtake Mode range from 2026.
+ * The threshold is the same in both eras (`ATTACK_RANGE_S`); only its name changes.
  *
  * Two independent reads of how fast the gap is closing, combined, as the brief asks:
  *
@@ -15,9 +16,9 @@
  * low confidence. The gap is then stepped forward a lap at a time until it drops
  * inside one second, or the race runs out.
  */
+import { ATTACK_RANGE_S } from '@/lib/season';
 import { weakest, type Confidence } from './confidence';
 
-export const DRS_RANGE_S = 1;
 /** Laps the trend is measured over. */
 export const TREND_LAPS = 3;
 
@@ -41,8 +42,8 @@ export interface BattleForecastInput {
 }
 
 export interface BattleForecast {
-  /** Laps until within DRS range. 0 when already there; null when not before the end. */
-  lapsToDrs: number | null;
+  /** Laps until within the attack range. 0 when already there; null when not before the end. */
+  lapsToRange: number | null;
   notBeforeEnd: boolean;
   /** Seconds a lap the chaser is gaining now; negative when losing ground. */
   closingPerLap: number | null;
@@ -68,7 +69,7 @@ export function battleForecast(input: BattleForecastInput): BattleForecast {
 
   if (basis === 'none') {
     return {
-      lapsToDrs: null,
+      lapsToRange: null,
       notBeforeEnd: false,
       closingPerLap: null,
       basis,
@@ -86,9 +87,9 @@ export function battleForecast(input: BattleForecastInput): BattleForecast {
   const confidence: Confidence =
     basis === 'trend+pace' ? weakest(ahead!.confidence, chaser!.confidence) : 'low';
 
-  if (gap <= DRS_RANGE_S) {
+  if (gap <= ATTACK_RANGE_S) {
     return {
-      lapsToDrs: 0,
+      lapsToRange: 0,
       notBeforeEnd: false,
       closingPerLap: rateAt(0),
       basis,
@@ -100,9 +101,9 @@ export function battleForecast(input: BattleForecastInput): BattleForecast {
   let projected = gap;
   for (let k = 1; k <= lapsRemaining; k += 1) {
     projected -= rateAt(k);
-    if (projected <= DRS_RANGE_S) {
+    if (projected <= ATTACK_RANGE_S) {
       return {
-        lapsToDrs: k,
+        lapsToRange: k,
         notBeforeEnd: false,
         closingPerLap: rateAt(0),
         basis,
@@ -112,7 +113,7 @@ export function battleForecast(input: BattleForecastInput): BattleForecast {
     }
   }
   return {
-    lapsToDrs: null,
+    lapsToRange: null,
     notBeforeEnd: true,
     closingPerLap: rateAt(0),
     basis,

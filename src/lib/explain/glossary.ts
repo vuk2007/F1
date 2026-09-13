@@ -11,6 +11,10 @@
  * entry mentions a term from `GLOSSARY_TERMS` without one. A beginner who does not
  * know what an interval is cannot be expected to learn it from a sentence that
  * also assumes they know what DRS is.
+ *
+ * The 2026 entries (Overtake Mode, Boost Mode, Active Aero, harvesting, lift and
+ * coast, battery) describe the rules from that season on; DRS stays for replays of
+ * the seasons that had it.
  */
 import type { MetricKey } from './metrics';
 
@@ -34,7 +38,7 @@ export const GLOSSARY = {
     what: 'How far a driver is behind the car directly in front of them, in seconds. The [[gap]] is measured to the leader instead.',
     why: 'It decides whether an attack is possible: close enough, and the car behind can try to pass.',
     watch:
-      'Under one second gives the chasing car [[drs|DRS]], an extra burst of speed on the straights. Under about two seconds the car behind starts to struggle in the turbulent air.',
+      'Under one second gives the chasing car an overtaking aid: [[drs|DRS]] up to 2025, [[overtakeMode|Overtake Mode]] from 2026. Under about two seconds the car behind starts to struggle in the turbulent air.',
   },
   lapTime: {
     title: 'Lap time',
@@ -141,10 +145,52 @@ export const GLOSSARY = {
   },
   drs: {
     title: 'DRS',
-    what: 'Drag Reduction System: a flap on the rear wing that opens on certain straights to give extra speed.',
-    why: 'It helps the car behind get close enough to overtake.',
+    what: 'Drag Reduction System: a flap on the rear wing that opens on certain straights to give extra speed. Cars used it up to the end of 2025.',
+    why: 'It helps the car behind get close enough to overtake, and on many circuits it made a pass close to certain.',
     watch:
-      'A driver may only use it when within one second of the car ahead at a detection point, which is what "DRS range" on a card means. From 2026 it is replaced by a different overtaking aid.',
+      'A driver may only use it when within one second of the car ahead at a detection point, which is what "DRS range" on a card means. From 2026 the chasing car gets [[overtakeMode|Overtake Mode]] instead.',
+  },
+  overtakeMode: {
+    title: 'Overtake Mode',
+    what: 'From 2026: extra electrical energy for a driver who is within one second of the car ahead at a detection point. It can be used in one go or spread over the lap.',
+    why: 'It is the main help for the car behind, but unlike the old flap it does not make a pass close to certain: the car ahead can defend with [[boostMode|Boost Mode]].',
+    watch:
+      '"OM range" on a card means a driver is within that second. A driver who stays in range for several laps, with energy saved from [[energyHarvesting|harvesting]], is usually building up to an attack.',
+  },
+  boostMode: {
+    title: 'Boost Mode',
+    what: 'From 2026: a button that gives a driver maximum power, engine and [[batteryState|battery]] together, anywhere on the lap.',
+    why: 'Drivers can use it to attack or to defend, but the energy it spends is missing later in the lap.',
+    watch:
+      'A car suddenly faster on a straight than on its earlier laps, without more throttle, may have used it. The teams do not publish when it is pressed, so the app only ever says "likely".',
+  },
+  activeAero: {
+    title: 'Active Aero',
+    what: 'From 2026 the front and rear wings move. In Corner mode they give grip through the bends; in Straight mode they flatten to cut drag and add speed.',
+    why: 'Every car can use Straight mode in marked zones, however far it is from the car ahead, so it raises everyone’s top speed rather than helping the car behind.',
+    watch:
+      'Top speeds climb on the long straights for the whole field. It does not help with passing on its own; for that see [[overtakeMode|Overtake Mode]].',
+  },
+  energyHarvesting: {
+    title: 'Energy harvesting',
+    what: 'Recharging the [[batteryState|battery]] while driving: under braking, and sometimes by lifting off the throttle early.',
+    why: 'From 2026 about half of the car’s power is electric, so energy stored now decides how fast a driver can go later.',
+    watch:
+      'A driver who harvests a lot on one lap may be saving up for an attack, or a defence, on the next. One way to do it is to [[liftAndCoast|lift and coast]].',
+  },
+  liftAndCoast: {
+    title: 'Lift and coast',
+    what: 'Lifting off the throttle before the braking point and rolling for a moment before braking.',
+    why: 'It saves fuel and lets the car recover energy for the [[batteryState|battery]], at the cost of a little time.',
+    watch:
+      'In the telemetry it shows as the throttle dropping to zero while the speed is still near its peak. The app marks these as likely [[energyHarvesting|harvesting]] points, never as certain.',
+  },
+  batteryState: {
+    title: 'Battery state',
+    what: 'How much electrical energy is stored in the car at a given moment.',
+    why: 'From 2026 the battery is half of the car’s power: a driver who runs it low is slow on the straights and open to attack.',
+    watch:
+      'Teams do not publish it, so the app cannot show it. It estimates how hard drivers are using energy from their telemetry instead, and says so.',
   },
   safetyCar: {
     title: 'Safety car',
@@ -223,6 +269,12 @@ export const GLOSSARY_TERMS: Record<GlossaryKey, readonly string[]> = {
   undercut: ['undercut'],
   overcut: ['overcut'],
   drs: ['DRS'],
+  overtakeMode: ['Overtake Mode', 'OM range'],
+  boostMode: ['Boost Mode', 'Boost'],
+  activeAero: ['Active Aero', 'Straight mode', 'Corner mode'],
+  energyHarvesting: ['harvesting', 'harvest', 'harvests'],
+  liftAndCoast: ['lift and coast', 'lift-and-coast'],
+  batteryState: ['battery'],
   safetyCar: ['safety car'],
   vsc: ['virtual safety car', 'VSC'],
   trackTemp: ['track temperature'],

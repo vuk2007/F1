@@ -31,6 +31,13 @@ const REQUIRED: GlossaryKey[] = [
   'undercut',
   'overcut',
   'drs',
+  // 2026 regulations.
+  'overtakeMode',
+  'boostMode',
+  'activeAero',
+  'energyHarvesting',
+  'liftAndCoast',
+  'batteryState',
   'safetyCar',
   'vsc',
   'trackTemp',

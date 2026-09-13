@@ -5,10 +5,11 @@
  * two things worth pointing out. Tapping a card selects the driver, which opens the
  * same detail panels the Engineer view uses.
  */
-import { BADGE_TERM, type BadgeKind } from '@/lib/explain/driver-card';
+import { badgeLabel, badgeTerm, type BadgeKind } from '@/lib/explain/driver-card';
 import { compoundColour, compoundLetter, teamColour } from '@/lib/format';
 import { strings } from '@/lib/i18n/strings';
 import type { DriverTimingRow } from '@/lib/replay/selectors';
+import type { Regulations } from '@/lib/season';
 import { InfoTip } from '../InfoTip';
 
 export interface DriverCardData {
@@ -22,7 +23,7 @@ const BADGE_CLASS: Record<BadgeKind, string> = {
   underInvestigation: 'bg-danger/20 text-danger',
   pitSoon: 'bg-sector-yellow/20 text-sector-yellow',
   undercutThreat: 'bg-sector-yellow/20 text-sector-yellow',
-  drsRange: 'bg-sector-green/20 text-sector-green',
+  attackRange: 'bg-sector-green/20 text-sector-green',
   freshTyres: 'bg-accent/20 text-accent',
 };
 
@@ -30,10 +31,12 @@ function Card({
   card,
   selected,
   onSelect,
+  regulations,
 }: {
   card: DriverCardData;
   selected: boolean;
   onSelect: (driverNumber: number) => void;
+  regulations: Regulations;
 }) {
   const { row, statusLine, badges } = card;
   const number = row.driver.driver_number;
@@ -75,13 +78,13 @@ function Card({
         {badges.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
             {badges.map((badge) => {
-              const term = BADGE_TERM[badge];
+              const term = badgeTerm(badge, regulations);
               return (
                 <span
                   key={badge}
                   className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold ${BADGE_CLASS[badge]}`}
                 >
-                  {strings.simple.badges[badge]}
+                  {badgeLabel(badge, regulations)}
                   {term && <InfoTip term={term} />}
                 </span>
               );
@@ -110,10 +113,13 @@ export function DriverCards({
   cards,
   selectedDriver,
   onSelectDriver,
+  regulations,
 }: {
   cards: DriverCardData[];
   selectedDriver: number | null;
   onSelectDriver: (driverNumber: number) => void;
+  /** Which era's name the one-second badge uses. */
+  regulations: Regulations;
 }) {
   const text = strings.simple.cards;
 
@@ -149,6 +155,7 @@ export function DriverCards({
               card={card}
               selected={selectedDriver === card.row.driver.driver_number}
               onSelect={onSelectDriver}
+              regulations={regulations}
             />
           </li>
         ))}

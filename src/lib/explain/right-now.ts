@@ -12,6 +12,7 @@ import { strings } from '@/lib/i18n/strings';
 import type { Weather } from '@/lib/openf1/types';
 import type { KeyBattle } from '@/lib/replay/battles';
 import type { DriverTimingRow, TrackStatus } from '@/lib/replay/selectors';
+import { ATTACK_RANGE_S, type Regulations } from '@/lib/season';
 
 export type RightNowKind =
   | 'red'
@@ -39,6 +40,8 @@ export interface RightNowInput {
   inPitLane: string[];
   /** Closest battles first. */
   battles: Pick<KeyBattle, 'ahead' | 'chaser' | 'gap' | 'position' | 'trend'>[];
+  /** Names the one-second aid in a battle sentence: DRS up to 2025, Overtake Mode from 2026. */
+  regulations?: Regulations;
 }
 
 export interface RightNow {
@@ -62,6 +65,7 @@ export function joinNames(names: string[]): string {
 
 export function rightNow(input: RightNowInput): RightNow {
   const { rows, status, weather, lap, totalLaps, isRace, inPitLane, battles } = input;
+  const regulations = input.regulations ?? 'drs';
   const leader = rows[0];
   const second = rows[1];
 
@@ -117,6 +121,10 @@ export function rightNow(input: RightNowInput): RightNow {
         fight.gap.toFixed(1),
         fight.position,
         fight.trend,
+        // Only 2026 names the aid: "in Overtake Mode range" is news, "within DRS range" was the default.
+        regulations === 'overtake-mode' && fight.gap <= ATTACK_RANGE_S
+          ? strings.simple.attackRange[regulations].phrase
+          : null,
       ),
     };
   }

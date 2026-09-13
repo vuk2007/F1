@@ -9,17 +9,25 @@
 import { strings } from '@/lib/i18n/strings';
 import type { PitVerdict } from '@/lib/models/pit-window';
 import type { DriverTimingRow, TrackStatus } from '@/lib/replay/selectors';
+import { ATTACK_RANGE_S, attackRangeTerm, type Regulations } from '@/lib/season';
 import type { GlossaryKey } from './glossary';
 
 const EPSILON = 1e-6;
 
-/** Within this interval the car behind can use DRS. */
-export const DRS_RANGE_S = 1;
 /** Tyres this young, after a stop, count as fresh. */
 export const FRESH_TYRE_LAPS = 3;
 
+/**
+ * `attackRange` is within a second of the car ahead: DRS range before 2026,
+ * Overtake Mode range from 2026. One badge, named for the era — see `season.ts`.
+ */
 export type BadgeKind =
-  'fastestLap' | 'underInvestigation' | 'pitSoon' | 'undercutThreat' | 'drsRange' | 'freshTyres';
+  | 'fastestLap'
+  | 'underInvestigation'
+  | 'pitSoon'
+  | 'undercutThreat'
+  | 'attackRange'
+  | 'freshTyres';
 
 /** Highest priority first: when more than two apply, these win. */
 export const BADGE_PRIORITY: BadgeKind[] = [
@@ -27,20 +35,30 @@ export const BADGE_PRIORITY: BadgeKind[] = [
   'underInvestigation',
   'pitSoon',
   'undercutThreat',
-  'drsRange',
+  'attackRange',
   'freshTyres',
 ];
 
 export const MAX_BADGES = 2;
 
-/** The glossary entry that explains each badge, where one exists. */
-export const BADGE_TERM: Partial<Record<BadgeKind, GlossaryKey>> = {
+const FIXED_TERMS: Partial<Record<BadgeKind, GlossaryKey>> = {
   fastestLap: 'lapTime',
   pitSoon: 'pitStop',
   undercutThreat: 'undercut',
-  drsRange: 'drs',
   freshTyres: 'tyreAge',
 };
+
+/** The glossary entry that explains a badge, where one exists. */
+export function badgeTerm(kind: BadgeKind, regulations: Regulations): GlossaryKey | undefined {
+  return kind === 'attackRange' ? attackRangeTerm(regulations) : FIXED_TERMS[kind];
+}
+
+/** The badge's text: "DRS range" in a DRS season, "OM range" from 2026. */
+export function badgeLabel(kind: BadgeKind, regulations: Regulations): string {
+  return kind === 'attackRange'
+    ? strings.simple.attackRange[regulations].badge
+    : strings.simple.badges[kind]!;
+}
 
 function plural(compound: string | null): string | null {
   if (!compound) return null;
@@ -113,7 +131,7 @@ export interface BadgeContext {
  * Up to two badges, highest priority first.
  *
  * Racing badges only apply in a race: in qualifying everyone is on fresh tyres and
- * nobody is in DRS range of anybody in a meaningful sense.
+ * nobody is fighting for a one-second window in a meaningful sense.
  */
 export function driverBadges(context: BadgeContext): BadgeKind[] {
   const { row, behind, isRace, status, sessionBestLap, underInvestigation, pitVerdict, slope } =
@@ -152,6 +170,7 @@ export function driverBadges(context: BadgeContext): BadgeKind[] {
     found.add('undercutThreat');
   }
 
+  /* Both aids are switched off under a safety car, so the badge is green-flag only. */
   if (
     isRace &&
     status === 'green' &&
@@ -159,9 +178,9 @@ export function driverBadges(context: BadgeContext): BadgeKind[] {
     row.position > 1 &&
     row.interval.seconds != null &&
     row.interval.seconds > 0 &&
-    row.interval.seconds <= DRS_RANGE_S
+    row.interval.seconds <= ATTACK_RANGE_S
   ) {
-    found.add('drsRange');
+    found.add('attackRange');
   }
 
   if (isRace && row.pitCount > 0 && row.tyre.age != null && row.tyre.age <= FRESH_TYRE_LAPS) {

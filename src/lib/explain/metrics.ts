@@ -46,7 +46,7 @@ export const METRICS = {
     what: 'Time to the car directly ahead on track.',
     why: 'This is the number that decides whether an attack, a pit stop or a DRS pass is possible.',
     reading:
-      'Under 1.0s means DRS is available on the next detection point. Under about 2.5s means the following car is losing downforce in dirty air and will hurt its tyres.',
+      'Under 1.0s at the detection point unlocks the overtaking aid: DRS up to 2025, extra Overtake Mode energy from 2026. Under about 2.5s means the following car is losing downforce in dirty air and will hurt its tyres.',
   },
   lastLap: {
     title: 'Last lap',
@@ -186,7 +186,7 @@ export const METRICS = {
     what: 'Time difference between the two laps at each point on the track.',
     why: 'It turns two similar-looking traces into an exact answer about where the lap was won.',
     reading:
-      'Negative means the first driver is ahead. What matters is the slope, not the value: a falling line means the first driver is gaining right there. A step down under braking is a later brake point; a steady drift on a straight is usually engine mode, DRS or slipstream.',
+      'Negative means the first driver is ahead. What matters is the slope, not the value: a falling line means the first driver is gaining right there. A step down under braking is a later brake point; a steady drift on a straight is usually engine mode, slipstream, or the overtaking aid (DRS up to 2025, Overtake Mode or Boost from 2026).',
   },
   undercut: {
     title: 'Undercut',

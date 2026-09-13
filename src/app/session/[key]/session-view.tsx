@@ -23,6 +23,7 @@ import { ViewModeToggle } from '@/components/simple/ViewModeToggle';
 import { Predictions } from '@/components/simple/predictions/Predictions';
 import { buildPredictions } from '@/lib/models/predict/assemble';
 import { CALIBRATION } from '@/lib/models/predict/calibration';
+import { regulationsFor } from '@/lib/season';
 import { lapChartCaption, paceCaption } from '@/lib/explain/captions';
 import { driverBadges, driverStatusLine } from '@/lib/explain/driver-card';
 import { openInvestigations } from '@/lib/explain/investigations';
@@ -446,6 +447,7 @@ export function SessionView({
         isRace,
         inPitLane: driversInPitLane(dataset, timeMs).map((n) => acronym.get(n) ?? String(n)),
         battles,
+        regulations: regulationsFor(dataset.session.year),
       }),
       progress: lapProgress(view.lap, models.totalLaps, isRace),
       flag: flagChip(view.status),
@@ -571,6 +573,7 @@ export function SessionView({
                 cards={simple.cards}
                 selectedDriver={selectedDriver}
                 onSelectDriver={selectDriver}
+                regulations={regulationsFor(session.year)}
               />
               {/* Outside a race the order is by best lap, so nobody is fighting anybody. */}
               {models?.isRace && <KeyBattles battles={simple.battles} />}

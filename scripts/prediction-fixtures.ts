@@ -17,6 +17,13 @@
  *   10008  Bahrain 2025 practice 2  long runs, for the race degradation forecast
  *   10009  Bahrain 2025 practice 3  for the Q3 cut-off forecast
  *   10010  Bahrain 2025 qualifying  what the Q3 cut-off actually was
+ *   11361  Italian GP 2026 race     first season without DRS, for the 2026 models
+ *   11280  Miami GP 2026 race       a second 2026 race, so no 2026 rate rests on one race
+ *   11355  Monza 2026 practice 2    long runs on the 2026 tyres
+ *   11356  Monza 2026 practice 3    for the 2026 Q3 cut-off forecast
+ *   11357  Monza 2026 qualifying    what that cut-off actually was
+ *
+ *   node scripts/prediction-fixtures.ts --only=2026   downloads just the names containing "2026"
  *
  * The files are trimmed to what the models read. The interval feed is the big one
  * — 36,876 rows and 5.2 MB for one race — and is reduced to the sample each
@@ -41,7 +48,14 @@ const SESSIONS: { key: number; name: string; race: boolean }[] = [
   { key: 10008, name: 'bahrain-2025-fp2', race: false },
   { key: 10009, name: 'bahrain-2025-fp3', race: false },
   { key: 10010, name: 'bahrain-2025-qualifying', race: false },
+  { key: 11361, name: 'monza-2026-race', race: true },
+  { key: 11280, name: 'miami-2026-race', race: true },
+  { key: 11355, name: 'monza-2026-fp2', race: false },
+  { key: 11356, name: 'monza-2026-fp3', race: false },
+  { key: 11357, name: 'monza-2026-qualifying', race: false },
 ];
+
+const only = process.argv.find((arg) => arg.startsWith('--only='))?.slice('--only='.length);
 
 /** Comfortably inside OpenF1's 3 requests/s and 30 requests/minute. */
 const GAP_MS = 2100;
@@ -102,7 +116,7 @@ function intervalsAtLapStarts(intervals: Row[], laps: Row[]): Row[] {
 
 fs.mkdirSync(OUT, { recursive: true });
 
-for (const { key, name, race } of SESSIONS) {
+for (const { key, name, race } of SESSIONS.filter((s) => !only || s.name.includes(only))) {
   console.log(`\n${name} (${key})`);
   const [session] = await get('sessions', key);
   const drivers = await get('drivers', key);

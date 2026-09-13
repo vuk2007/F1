@@ -13,7 +13,8 @@ import type { SessionDataset } from '@/lib/openf1/dataset';
 import { toTimed, valueAt } from '@/lib/replay/timeline';
 import { cautionPeriods, overlapsCaution } from '../caution';
 import { raceDistance } from '../race-distance';
-import { battleForecast, DRS_RANGE_S, type CarPace } from './battle-forecast';
+import { ATTACK_RANGE_S } from '@/lib/season';
+import { battleForecast, type CarPace } from './battle-forecast';
 import { cheapStop } from './cheap-stop';
 import { cleanOnly, IntervalLookup, predictionLaps } from './clean-laps';
 import type { LogisticModel } from './logistic';
@@ -358,7 +359,7 @@ export function evaluateBattleForecast(dataset: SessionDataset): HitRate {
       if (start == null || earlier == null) continue;
       const gap = race.intervals.intervalAt(chaser, start);
       const then = race.intervals.intervalAt(chaser, earlier);
-      if (gap == null || gap <= DRS_RANGE_S || gap > 3) continue;
+      if (gap == null || gap <= ATTACK_RANGE_S || gap > 3) continue;
       if (
         stopsNear(ahead, lap - 3, lap + BATTLE_HORIZON_LAPS) ||
         stopsNear(chaser, lap - 3, lap + BATTLE_HORIZON_LAPS)
@@ -378,12 +379,12 @@ export function evaluateBattleForecast(dataset: SessionDataset): HitRate {
       for (let k = 1; k <= BATTLE_HORIZON_LAPS; k += 1) {
         const t = race.lapStart(chaser, lap + k);
         const value = t == null ? null : race.intervals.intervalAt(chaser, t);
-        if (value != null && value <= DRS_RANGE_S) {
+        if (value != null && value <= ATTACK_RANGE_S) {
           actual = k;
           break;
         }
       }
-      const predicted = forecast.lapsToDrs;
+      const predicted = forecast.lapsToRange;
       const hit =
         predicted == null ? actual == null : actual != null && Math.abs(predicted - actual) <= 2;
       outcomes.push({

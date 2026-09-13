@@ -45,7 +45,8 @@ export const METHODS = {
   },
   battleForecast: {
     title: 'Battle forecast',
-    estimates: 'How many laps until the chasing car is within one second, close enough to use DRS.',
+    estimates:
+      'How many laps until the chasing car is within one second of the car ahead: close enough for DRS up to 2025, or for Overtake Mode from 2026. In 2026 it also says whether Overtake Mode is available next lap, from the gap now and whether race control has it switched on.',
     computed:
       'Two reads of how fast the gap is closing are averaged: what it did over the last three laps, and each car’s predicted lap times including tyre wear. The gap is then moved forward a lap at a time.',
     trust:

@@ -19,7 +19,7 @@ describe('battleForecast', () => {
       chaser: null,
       lapsRemaining: 30,
     });
-    expect(f).toMatchObject({ lapsToDrs: 7, basis: 'trend', confidence: 'low', enough: true });
+    expect(f).toMatchObject({ lapsToRange: 7, basis: 'trend', confidence: 'low', enough: true });
     expect(f.closingPerLap).toBeCloseTo(0.3, 6);
   });
 
@@ -32,7 +32,7 @@ describe('battleForecast', () => {
       chaser: car(),
       lapsRemaining: 30,
     });
-    expect(f).toMatchObject({ lapsToDrs: 3, basis: 'pace' });
+    expect(f).toMatchObject({ lapsToRange: 3, basis: 'pace' });
   });
 
   it('sees closing speed up when the car ahead is wearing faster', () => {
@@ -50,7 +50,7 @@ describe('battleForecast', () => {
       chaser: car(),
       lapsRemaining: 40,
     });
-    expect(wearing.lapsToDrs!).toBeLessThan(steady.lapsToDrs!);
+    expect(wearing.lapsToRange!).toBeLessThan(steady.lapsToRange!);
   });
 
   it('averages the trend and the model when it has both', () => {
@@ -75,7 +75,7 @@ describe('battleForecast', () => {
       chaser: null,
       lapsRemaining: 8,
     });
-    expect(f).toMatchObject({ lapsToDrs: null, notBeforeEnd: true });
+    expect(f).toMatchObject({ lapsToRange: null, notBeforeEnd: true });
   });
 
   it('says not before the end when the gap is growing', () => {
@@ -88,7 +88,7 @@ describe('battleForecast', () => {
   it('reports a car already in range', () => {
     expect(
       battleForecast({ gap: 0.7, gapChange: 0, ahead: null, chaser: null, lapsRemaining: 30 })
-        .lapsToDrs,
+        .lapsToRange,
     ).toBe(0);
   });
 

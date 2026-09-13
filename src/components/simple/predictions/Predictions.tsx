@@ -47,7 +47,10 @@ export function Predictions({
         <div className="grid gap-3 md:grid-cols-2">
           <CheapStopCard cheap={predictions.cheapStop} />
           <TyrePerformanceCard tyres={predictions.tyres} />
-          <BattleForecastCard battles={predictions.battles} />
+          <BattleForecastCard
+            battles={predictions.battles}
+            regulations={predictions.regulations}
+          />
           <OvertakeCard battles={predictions.battles} />
           {predictions.driver ? (
             <>

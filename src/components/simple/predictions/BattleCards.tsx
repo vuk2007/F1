@@ -1,9 +1,14 @@
 'use client';
 
-/** Cards 4 and 5: when each close chaser reaches DRS range, and how likely a pass is. */
+/**
+ * Cards 4 and 5: when each close chaser reaches the one-second attack range, and how
+ * likely a pass is. The range is named for the era — DRS up to 2025, Overtake Mode
+ * from 2026 — and a 2026 battle also says whether Overtake Mode is available next lap.
+ */
 import { strings } from '@/lib/i18n/strings';
 import type { BattlePrediction } from '@/lib/models/predict/assemble';
 import { weakest } from '@/lib/models/predict/confidence';
+import type { Regulations } from '@/lib/season';
 import { ConfidenceChip, NotEnough, PredictionCard } from './PredictionCard';
 
 function Pair({ battle }: { battle: BattlePrediction }) {
@@ -18,8 +23,15 @@ function Pair({ battle }: { battle: BattlePrediction }) {
   );
 }
 
-export function BattleForecastCard({ battles }: { battles: BattlePrediction[] }) {
+export function BattleForecastCard({
+  battles,
+  regulations,
+}: {
+  battles: BattlePrediction[];
+  regulations: Regulations;
+}) {
   const text = strings.simple.predictions.battles;
+  const range = strings.simple.attackRange[regulations].phrase;
   const measured = battles.filter((b) => b.forecast.enough);
 
   return (
@@ -45,16 +57,19 @@ export function BattleForecastCard({ battles }: { battles: BattlePrediction[] })
                 {f.enough ? (
                   <div className="mt-0.5 flex flex-wrap items-center justify-between gap-1">
                     <span className="text-foreground">
-                      {f.lapsToDrs === 0
-                        ? text.inDrs
-                        : f.lapsToDrs != null
-                          ? text.drsIn(f.lapsToDrs)
-                          : text.notBeforeEnd}
+                      {f.lapsToRange === 0
+                        ? text.inRange(range)
+                        : f.lapsToRange != null
+                          ? text.rangeIn(range, f.lapsToRange)
+                          : text.notBeforeEnd(range)}
                     </span>
                     <ConfidenceChip level={f.confidence} />
                   </div>
                 ) : (
                   <NotEnough />
+                )}
+                {regulations === 'overtake-mode' && battle.overtakeModeNextLap != null && (
+                  <p className="text-muted mt-0.5">{text.omNextLap(battle.overtakeModeNextLap)}</p>
                 )}
               </li>
             );

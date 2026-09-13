@@ -349,9 +349,18 @@ export const strings = {
       underInvestigation: 'Under investigation',
       pitSoon: 'Pit soon',
       undercutThreat: 'Undercut threat',
-      drsRange: 'DRS range',
       freshTyres: 'Fresh tyres',
     } as Record<string, string>,
+
+    /* The one-second rule, named for the era the session ran in. See lib/season.ts. */
+    attackRange: {
+      drs: { badge: 'DRS range', phrase: 'within DRS range', name: 'DRS' },
+      'overtake-mode': {
+        badge: 'OM range',
+        phrase: 'in Overtake Mode range',
+        name: 'Overtake Mode',
+      },
+    },
 
     cards: {
       heading: 'Running order',
@@ -393,8 +402,18 @@ export const strings = {
           : `${lapsLeft} ${lapsLeft === 1 ? 'lap' : 'laps'} to go, and ${leader} leads.`,
       pits: (names: string, many: boolean) =>
         `${names} ${many ? 'are' : 'is'} in the pit lane for fresh tyres.`,
-      battle: (chaser: string, ahead: string, gap: string, position: number, trend: string) =>
+      /* `range` is the era's phrase when the chaser is within a second, e.g. "in Overtake Mode range". */
+      battle: (
+        chaser: string,
+        ahead: string,
+        gap: string,
+        position: number,
+        trend: string,
+        range: string | null = null,
+      ) =>
         `Closest fight: ${chaser} is ${gap} s behind ${ahead} for P${position}${
+          range ? `, ${range}` : ''
+        }${
           trend === 'closing' ? ', and closing' : trend === 'opening' ? ', but dropping back' : ''
         }.`,
       leaderRace: (leader: string, second: string, gap: string) =>
@@ -532,9 +551,12 @@ export const strings = {
         pair: (chaser: string, ahead: string, position: number) =>
           `${chaser} chasing ${ahead} for P${position}`,
         gap: (seconds: string) => `${seconds} s apart`,
-        inDrs: 'Already within DRS range',
-        drsIn: (laps: number) => `Within DRS range in about ${laps} ${laps === 1 ? 'lap' : 'laps'}`,
-        notBeforeEnd: 'Not within DRS range before the end',
+        /* `range` is the era's phrase: "within DRS range" or "in Overtake Mode range". */
+        inRange: (range: string) => `Already ${range}`,
+        rangeIn: (range: string, laps: number) =>
+          `${range.charAt(0).toUpperCase()}${range.slice(1)} in about ${laps} ${laps === 1 ? 'lap' : 'laps'}`,
+        notBeforeEnd: (range: string) => `Not ${range} before the end`,
+        omNextLap: (available: boolean) => `Overtake Mode available next lap: ${available ? 'yes' : 'no'}`,
         overtake: (percent: number) => `${percent}% chance of a pass within 5 laps`,
       },
 

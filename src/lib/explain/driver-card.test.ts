@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { driverBadges, driverStatusLine, type BadgeContext } from './driver-card';
+import {
+  badgeLabel,
+  badgeTerm,
+  driverBadges,
+  driverStatusLine,
+  type BadgeContext,
+} from './driver-card';
 import { makeRow } from './rows.fixture';
 
 describe('driverStatusLine', () => {
@@ -82,15 +88,24 @@ describe('driverBadges', () => {
     expect(driverBadges(context())).toEqual([]);
   });
 
-  it('flags DRS range inside a second, but not for the leader', () => {
+  it('flags the one-second attack range, but not for the leader', () => {
     expect(driverBadges(context({ row: makeRow('NOR', 2, { interval: 0.9 }) }))).toEqual([
-      'drsRange',
+      'attackRange',
     ]);
     expect(driverBadges(context({ row: makeRow('NOR', 2, { interval: 1.1 }) }))).toEqual([]);
     expect(driverBadges(context({ row: makeRow('VER', 1, { interval: 0 }) }))).toEqual([]);
   });
 
-  it('does not offer DRS under a safety car, when it is disabled', () => {
+  it('names the attack range for the era: DRS up to 2025, Overtake Mode from 2026', () => {
+    expect(badgeLabel('attackRange', 'drs')).toBe('DRS range');
+    expect(badgeTerm('attackRange', 'drs')).toBe('drs');
+    expect(badgeLabel('attackRange', 'overtake-mode')).toBe('OM range');
+    expect(badgeTerm('attackRange', 'overtake-mode')).toBe('overtakeMode');
+    // Other badges do not change with the season.
+    expect(badgeLabel('pitSoon', 'overtake-mode')).toBe(badgeLabel('pitSoon', 'drs'));
+  });
+
+  it('does not offer the aid under a safety car, when it is disabled', () => {
     expect(
       driverBadges(context({ row: makeRow('NOR', 2, { interval: 0.5 }), status: 'sc' })),
     ).toEqual([]);
