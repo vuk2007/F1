@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linearFit, predict, residual } from './regression';
+import { linearFit, predict, predictQuadratic, quadraticFit, residual } from './regression';
 
 describe('linearFit', () => {
   it('recovers an exact line', () => {
@@ -98,5 +98,43 @@ describe('predict and residual', () => {
     ])!;
     expect(residual(fit, { x: 1, y: 2 })).toBeCloseTo(1, 10);
     expect(residual(fit, { x: 1, y: 0 })).toBeCloseTo(-1, 10);
+  });
+});
+
+describe('quadraticFit', () => {
+  it('recovers a known curve exactly', () => {
+    const points = [0, 1, 2, 3, 4, 5, 6].map((x) => ({ x, y: 90 + 0.05 * x + 0.02 * x * x }));
+    const fit = quadraticFit(points)!;
+    // At any x the fitted curve must match the generating one.
+    for (const x of [0, 3, 6, 10]) {
+      expect(predictQuadratic(fit, x)).toBeCloseTo(90 + 0.05 * x + 0.02 * x * x, 6);
+    }
+    expect(fit.c).toBeCloseTo(0.02, 6);
+    expect(fit.residualStdDev).toBeCloseTo(0, 6);
+  });
+
+  it('finds no meaningful curvature in a straight line with noise', () => {
+    const noise = [0.1, -0.08, 0.05, -0.12, 0.07, -0.03, 0.09, -0.06, 0.02, -0.04];
+    const points = noise.map((e, x) => ({ x, y: 90 + 0.05 * x + e }));
+    const fit = quadraticFit(points)!;
+    expect(Math.abs(fit.c / fit.cStdError)).toBeLessThan(2);
+  });
+
+  it('refuses too few points or too few distinct x values', () => {
+    expect(
+      quadraticFit([
+        { x: 1, y: 1 },
+        { x: 2, y: 2 },
+        { x: 3, y: 4 },
+      ]),
+    ).toBeNull();
+    expect(
+      quadraticFit([
+        { x: 1, y: 1 },
+        { x: 1, y: 2 },
+        { x: 2, y: 2 },
+        { x: 2, y: 3 },
+      ]),
+    ).toBeNull();
   });
 });

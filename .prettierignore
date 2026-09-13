@@ -2,4 +2,6 @@
 node_modules
 pnpm-lock.yaml
 bridge/fixtures
+src/lib/models/predict/__fixtures__
 recordings
+src/lib/models/predict/calibration.json
