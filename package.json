@@ -16,7 +16,9 @@
     "smoke": "vitest run --config vitest.smoke.mts",
     "bridge": "node bridge/src/index.ts",
     "bridge:capture": "node bridge/src/capture.ts",
-    "typecheck:bridge": "tsc --noEmit -p bridge"
+    "typecheck:bridge": "tsc --noEmit -p bridge",
+    "calibrate": "node --import ./scripts/register-aliases.mjs scripts/calibrate.ts",
+    "hit-rates": "node --import ./scripts/register-aliases.mjs scripts/hit-rates.ts"
   },
   "dependencies": {
     "idb": "^8.0.3",

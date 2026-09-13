@@ -1,0 +1,245 @@
+{
+  "generatedAt": "2026-09-13T08:58:53.711Z",
+  "method": "Overtake: logistic regression (Newton, L2 0.01, standardised features) on every adjacent pair within 3.0 s at a lap start in dry 2024-2025 races; label = chaser ahead at the start of any of the next 5 laps; samples with a stop or caution inside the window excluded. Q3 cut-off: median over weekends of (FP3 tenth-best lap - Q2 tenth-best lap); spread is the median absolute deviation. Sessions 9912, 10014 and 9920 (and their weekends) held out for the prediction tests.",
+  "overtake": {
+    "featureNames": [
+      "gap",
+      "paceDelta",
+      "tyreAgeDelta",
+      "compoundDelta"
+    ],
+    "means": [
+      1.4177566960273251,
+      0.019581161243933096,
+      1.2799748337228114,
+      0.006920726226856013
+    ],
+    "stds": [
+      0.7511711548872073,
+      0.5649755433383816,
+      7.13365178654639,
+      0.5425013060752353
+    ],
+    "weights": [
+      -0.8333578082663676,
+      1.1841880341654445,
+      0.5250050700967467,
+      -0.007787836204692773
+    ],
+    "bias": -2.7545362507001863,
+    "samples": 11126,
+    "passes": 1438,
+    "baseRate": 0.12924680927557072,
+    "logLoss": 0.26506269188055165,
+    "baseLogLoss": 0.3849524097089864,
+    "races": [
+      "2024 Sakhir",
+      "2024 Jeddah",
+      "2024 Melbourne",
+      "2024 Suzuka",
+      "2024 Shanghai",
+      "2024 Miami",
+      "2024 Imola",
+      "2024 Monaco",
+      "2024 Barcelona",
+      "2024 Spielberg",
+      "2024 Budapest",
+      "2024 Spa-Francorchamps",
+      "2024 Zandvoort",
+      "2024 Monza",
+      "2024 Baku",
+      "2024 Marina Bay",
+      "2024 Austin",
+      "2024 Mexico City",
+      "2024 Las Vegas",
+      "2024 Lusail",
+      "2024 Yas Island",
+      "2025 Shanghai",
+      "2025 Suzuka",
+      "2025 Jeddah",
+      "2025 Imola",
+      "2025 Monaco",
+      "2025 Barcelona",
+      "2025 Montréal",
+      "2025 Spielberg",
+      "2025 Budapest",
+      "2025 Baku",
+      "2025 Austin",
+      "2025 Mexico City",
+      "2025 São Paulo",
+      "2025 Las Vegas",
+      "2025 Lusail",
+      "2025 Yas Island"
+    ],
+    "skipped": [
+      "2024 Montréal (wet)",
+      "2024 Silverstone (wet)",
+      "2024 São Paulo (wet)",
+      "2025 Melbourne (wet)",
+      "2025 Sakhir (held out)",
+      "2025 Miami Gardens (wet)",
+      "2025 Silverstone (wet)",
+      "2025 Spa-Francorchamps (wet)",
+      "2025 Zandvoort (held out)",
+      "2025 Monza (held out)",
+      "2025 Marina Bay (wet)"
+    ]
+  },
+  "q3Cutoff": {
+    "medianImprovement": 0.688,
+    "spread": 0.18300000000000005,
+    "weekends": 25,
+    "detail": [
+      {
+        "weekend": "2024 Sakhir",
+        "fp3Tenth": 91.396,
+        "q2Tenth": 90.122,
+        "improvement": 1.274
+      },
+      {
+        "weekend": "2024 Jeddah",
+        "fp3Tenth": 89.306,
+        "q2Tenth": 88.606,
+        "improvement": 0.7
+      },
+      {
+        "weekend": "2024 Melbourne",
+        "fp3Tenth": 77.49,
+        "q2Tenth": 76.901,
+        "improvement": 0.589
+      },
+      {
+        "weekend": "2024 Suzuka",
+        "fp3Tenth": 90.383,
+        "q2Tenth": 89.417,
+        "improvement": 0.966
+      },
+      {
+        "weekend": "2024 Imola",
+        "fp3Tenth": 76.547,
+        "q2Tenth": 75.691,
+        "improvement": 0.856
+      },
+      {
+        "weekend": "2024 Monaco",
+        "fp3Tenth": 72.087,
+        "q2Tenth": 71.216,
+        "improvement": 0.871
+      },
+      {
+        "weekend": "2024 Barcelona",
+        "fp3Tenth": 73.907,
+        "q2Tenth": 72.109,
+        "improvement": 1.798
+      },
+      {
+        "weekend": "2024 Monza",
+        "fp3Tenth": 80.943,
+        "q2Tenth": 80.411,
+        "improvement": 0.532
+      },
+      {
+        "weekend": "2024 Marina Bay",
+        "fp3Tenth": 91.082,
+        "q2Tenth": 90.45,
+        "improvement": 0.632
+      },
+      {
+        "weekend": "2024 Mexico City",
+        "fp3Tenth": 77.494,
+        "q2Tenth": 77.048,
+        "improvement": 0.446
+      },
+      {
+        "weekend": "2024 Las Vegas",
+        "fp3Tenth": 94.905,
+        "q2Tenth": 93.114,
+        "improvement": 1.791
+      },
+      {
+        "weekend": "2024 Yas Island",
+        "fp3Tenth": 84.283,
+        "q2Tenth": 83.341,
+        "improvement": 0.942
+      },
+      {
+        "weekend": "2025 Melbourne",
+        "fp3Tenth": 76.597,
+        "q2Tenth": 76.112,
+        "improvement": 0.485
+      },
+      {
+        "weekend": "2025 Suzuka",
+        "fp3Tenth": 88.786,
+        "q2Tenth": 87.783,
+        "improvement": 1.003
+      },
+      {
+        "weekend": "2025 Jeddah",
+        "fp3Tenth": 88.679,
+        "q2Tenth": 88.102,
+        "improvement": 0.577
+      },
+      {
+        "weekend": "2025 Imola",
+        "fp3Tenth": 75.787,
+        "q2Tenth": 75.521,
+        "improvement": 0.266
+      },
+      {
+        "weekend": "2025 Monaco",
+        "fp3Tenth": 72.013,
+        "q2Tenth": 71.262,
+        "improvement": 0.751
+      },
+      {
+        "weekend": "2025 Barcelona",
+        "fp3Tenth": 73.637,
+        "q2Tenth": 72.611,
+        "improvement": 1.026
+      },
+      {
+        "weekend": "2025 Montréal",
+        "fp3Tenth": 72.573,
+        "q2Tenth": 72.003,
+        "improvement": 0.57
+      },
+      {
+        "weekend": "2025 Spielberg",
+        "fp3Tenth": 65.182,
+        "q2Tenth": 65.052,
+        "improvement": 0.13
+      },
+      {
+        "weekend": "2025 Silverstone",
+        "fp3Tenth": 86.256,
+        "q2Tenth": 85.711,
+        "improvement": 0.545
+      },
+      {
+        "weekend": "2025 Budapest",
+        "fp3Tenth": 76.025,
+        "q2Tenth": 75.687,
+        "improvement": 0.338
+      },
+      {
+        "weekend": "2025 Marina Bay",
+        "fp3Tenth": 90.651,
+        "q2Tenth": 90.076,
+        "improvement": 0.575
+      },
+      {
+        "weekend": "2025 Mexico City",
+        "fp3Tenth": 77.526,
+        "q2Tenth": 76.804,
+        "improvement": 0.722
+      },
+      {
+        "weekend": "2025 Yas Island",
+        "fp3Tenth": 83.722,
+        "q2Tenth": 83.034,
+        "improvement": 0.688
+      }
+    ]
+  }
+}
