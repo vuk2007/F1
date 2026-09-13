@@ -461,6 +461,122 @@ export const strings = {
       watch: 'What to watch for',
       back: 'Back',
     },
+
+    /* Prediction cards. Every figure is an estimate and the wording says so. */
+    predictions: {
+      heading: 'Predictions',
+      subheading:
+        'Estimates worked out from the laps run so far, not facts. They change as the session goes on.',
+      estimate: 'Estimate',
+      confidence: {
+        low: 'Low confidence',
+        medium: 'Medium confidence',
+        high: 'High confidence',
+      } as Record<string, string>,
+      notEnough: 'Not enough data yet',
+      method: {
+        estimates: 'What it estimates',
+        computed: 'How it is worked out',
+        trust: 'How far to trust it',
+      },
+      methodButton: (title: string) => `How is the ${title.toLowerCase()} estimate worked out?`,
+      selectDriver: 'Tap a driver above to see their tyre life, pit window and strategy estimates.',
+
+      tyres: {
+        title: 'Tyre performance',
+        fastest: 'quickest tyre',
+        slower: (seconds: string) => `about ${seconds} s a lap slower than the quickest`,
+        paceUnknown: 'pace gap not measurable yet',
+        wear: (seconds: string) => `loses about ${seconds} s a lap as it wears`,
+        noWear: 'no measurable wear yet',
+        cliff: 'Dropping off: lap times are rising faster and faster',
+        chartTitle: 'Estimated lap time by tyre age, against the quickest tyre when 5 laps old',
+        axisAge: 'Tyre age (laps)',
+        tooltipAge: (age: number) => `${age} ${age === 1 ? 'lap' : 'laps'} old`,
+        slowerBy: (seconds: string) => `+${seconds} s`,
+        fasterBy: (seconds: string) => `−${seconds} s`,
+      },
+
+      life: {
+        title: (driver: string) => `Tyre life · ${driver}`,
+        lapsLeft: (laps: number) =>
+          `About ${laps} more ${laps === 1 ? 'lap' : 'laps'} before a stop pays off`,
+        toTheEnd: 'These tyres should be worth keeping to the flag',
+        spent: 'A new set would already be quicker, stop included',
+        tyres: (age: number, compound: string) => `on ${age}-lap-old ${compound}`,
+      },
+
+      pit: {
+        title: (driver: string) => `Pit window · ${driver}`,
+        best: (lap: number) => `Best lap to stop: ${lap}`,
+        window: (from: number, to: number) =>
+          from === to ? `Window: lap ${from}` : `Window: laps ${from}–${to}`,
+        noStop: 'No further stop needed on these numbers',
+        rejoin: (position: number, behind: string | null, gap: string | null) =>
+          behind
+            ? `If they pit now: back out in P${position}, ${gap} s behind ${behind}`
+            : `If they pit now: back out in P${position}, still leading`,
+        rejoinUnknown: 'Where they would rejoin needs a timed gap to the leader',
+        pitLoss: (seconds: string) => `A stop costs about ${seconds} s`,
+        source: {
+          observed: (stops: number) => `measured from ${stops} stops in this race`,
+          circuit: 'typical for this circuit until 2 stops are seen',
+          fallback: 'general figure until 2 stops are seen',
+        },
+      },
+
+      battles: {
+        title: 'Battle forecast',
+        overtakeTitle: 'Overtake chance',
+        none: 'No two cars are within 3 s of each other right now.',
+        pair: (chaser: string, ahead: string, position: number) =>
+          `${chaser} chasing ${ahead} for P${position}`,
+        gap: (seconds: string) => `${seconds} s apart`,
+        inDrs: 'Already within DRS range',
+        drsIn: (laps: number) => `Within DRS range in about ${laps} ${laps === 1 ? 'lap' : 'laps'}`,
+        notBeforeEnd: 'Not within DRS range before the end',
+        overtake: (percent: number) => `${percent}% chance of a pass within 5 laps`,
+      },
+
+      strategy: {
+        title: 'Pit strategy battle',
+        against: 'against',
+        legendRun: 'Run so far',
+        legendProjected: 'Projected, best plan',
+        lap: (lap: number) => `Lap ${lap}`,
+        combo: (x: string, xStops: number, y: string, yStops: number) =>
+          `${x} ${xStops}-stop · ${y} ${yStops}-stop`,
+        ahead: (label: string, seconds: string) => `${label} ahead by ${seconds} s`,
+        level: 'level at the flag',
+        stops: (stops: number) => `${stops} ${stops === 1 ? 'stop' : 'stops'} in total`,
+        unavailable: 'Both drivers need a measured stint on their current tyres first.',
+      },
+
+      cheap: {
+        sc: 'Safety car: cheap stop',
+        vsc: 'Virtual safety car: cheap stop',
+        cost: (reduced: string, normal: string) =>
+          `A stop now costs about ${reduced} s instead of ${normal} s.`,
+        gain: (now: number, green: number) => `stop now: P${now} instead of P${green} later`,
+        places: (places: number) => `+${places} ${places === 1 ? 'place' : 'places'}`,
+        stillNeeds: 'still has to stop',
+        nobody: 'Nobody gains a place by stopping now rather than later.',
+      },
+
+      practice: {
+        title: 'What this session says',
+        wear: 'Race tyre wear, from long runs',
+        wearValue: (seconds: string) => `about ${seconds} s a lap`,
+        runs: (runs: number) => `${runs} ${runs === 1 ? 'run' : 'runs'}`,
+        q3: 'Lap time likely needed to reach Q3',
+        q3Value: (time: string) => `about ${time}`,
+        q3From: (time: string) => `tenth best here ${time}`,
+        theory: 'Best lap against best possible',
+        theoryRow: (actual: string, theoretical: string) =>
+          `${actual} set · ${theoretical} possible`,
+        left: (seconds: string) => `${seconds} s left`,
+      },
+    },
   },
 
   common: {

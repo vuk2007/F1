@@ -20,6 +20,9 @@ import { Onboarding } from '@/components/simple/Onboarding';
 import { RaceStoryStrip } from '@/components/simple/RaceStoryStrip';
 import { RightNowBanner } from '@/components/simple/RightNowBanner';
 import { ViewModeToggle } from '@/components/simple/ViewModeToggle';
+import { Predictions } from '@/components/simple/predictions/Predictions';
+import { buildPredictions } from '@/lib/models/predict/assemble';
+import { CALIBRATION } from '@/lib/models/predict/calibration';
 import { lapChartCaption, paceCaption } from '@/lib/explain/captions';
 import { driverBadges, driverStatusLine } from '@/lib/explain/driver-card';
 import { openInvestigations } from '@/lib/explain/investigations';
@@ -70,6 +73,9 @@ import { useViewPrefs } from '@/lib/store/view-prefs';
  * rather than a second one that drifts out of step.
  */
 export type SessionViewMode = 'openf1' | 'live';
+
+/** How often the prediction cards are rebuilt, in session time. */
+const PREDICTION_STEP_MS = 10_000;
 
 export function SessionView({
   sessionKey,
@@ -447,6 +453,24 @@ export function SessionView({
     };
   }, [viewMode, dataset, models, view, timeMs]);
 
+  /*
+   * Prediction cards, Simple view only. Each rebuild refits every driver's stints
+   * on a snapshot, too much for every animation frame, so the clock is read in
+   * PREDICTION_STEP_MS steps: a replay at 16x still refreshes several times a lap.
+   */
+  const [rivalDriver, setRivalDriver] = useState<number | null>(null);
+  const predictionMs = Math.floor(timeMs / PREDICTION_STEP_MS) * PREDICTION_STEP_MS;
+  const predictions = useMemo(() => {
+    if (viewMode !== 'simple' || !dataset) return null;
+    return buildPredictions({
+      dataset,
+      timeMs: predictionMs,
+      selectedDriver,
+      rivalDriver,
+      calibration: CALIBRATION,
+    });
+  }, [viewMode, dataset, predictionMs, selectedDriver, rivalDriver]);
+
   /* Chart captions depend on the selection, not the clock. */
   const captions = useMemo(() => {
     if (viewMode !== 'simple' || !dataset) return null;
@@ -550,6 +574,13 @@ export function SessionView({
               />
               {/* Outside a race the order is by best lap, so nobody is fighting anybody. */}
               {models?.isRace && <KeyBattles battles={simple.battles} />}
+              {predictions && (
+                <Predictions
+                  predictions={predictions}
+                  drivers={dataset.drivers}
+                  onSelectRival={setRivalDriver}
+                />
+              )}
             </>
           ) : (
             <TimingTable
