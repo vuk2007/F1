@@ -221,6 +221,22 @@ export class DatasetAccumulator {
     this.#telemetryLimit = options.telemetryLimit ?? DEFAULT_TELEMETRY_LIMIT;
   }
 
+  /**
+   * Forgets everything timing-derived — laps, stints, stops, positions and gaps —
+   * and keeps the session, drivers, weather and race control. Called when a race
+   * starts, because until then the feed was still carrying the previous session's
+   * timing under the race's name.
+   */
+  clearTiming(): void {
+    this.#laps.clear();
+    this.#stints.clear();
+    this.#pits.clear();
+    this.#positions = new TimeSeries<Position>();
+    this.#intervals = new TimeSeries<Interval>();
+    this.#lastPosition.clear();
+    this.#lastInterval.clear();
+  }
+
   /** Folds one update's rows in. */
   apply(rows: NormalizedRows): void {
     if (rows.session) this.#session = rows.session;

@@ -78,6 +78,22 @@ export interface NormalizeContext {
   lapNumber: number | null;
   /** 1, 2 or 3 during qualifying, from `TimingData.SessionPart`. */
   qualifyingPhase: number | null;
+  /**
+   * `SessionInfo.Type`. A race ignores the qualifying-only fields, because before the
+   * start the feed still carries the qualifying session's timing under the race's
+   * SessionInfo — see `lapsFrom`.
+   */
+  sessionType?: string | null;
+}
+
+/**
+ * Whether a lap number can belong to this session yet: no car has completed a lap
+ * beyond the race's current lap. Outside a race `LapCount` is absent and every lap
+ * passes. On race day 2026 the pre-race feed still held qualifying laps 18-21 under
+ * the race's SessionInfo, which put "lap 21" on screen before the start.
+ */
+function plausibleLap(lap: number, ctx: NormalizeContext): boolean {
+  return ctx.lapNumber == null || lap <= ctx.lapNumber;
 }
 
 /**
@@ -217,6 +233,8 @@ export function normalizeStints(
 
     feedStints.forEach((stint, index) => {
       const startsAt = index === 0 ? 1 : (feedStints[index - 1]?.LapNumber ?? 1);
+      // A stint starting after the current race lap is left over from another session.
+      if (!plausibleLap(startsAt, ctx)) return;
       const endsAt = lapBeforeStintChange(stint.LapNumber);
 
       stints.push({
@@ -371,17 +389,24 @@ function lapsFrom(driverNumber: number, line: TimingDataDriver, ctx: NormalizeCo
 
   const addPair = (entry: { Value?: string; Lap?: number } | undefined) => {
     if (!entry || typeof entry.Lap !== 'number' || entry.Lap < 1) return;
+    if (!plausibleLap(entry.Lap, ctx)) return;
     const duration = parseFeedTime(entry.Value);
     if (duration === null) return;
     byLap.set(entry.Lap, blank(entry.Lap, duration));
   };
 
-  for (const best of line.BestLapTimes ?? []) addPair(best);
+  // One best per qualifying part. A race never sends them, so in a race they are stale.
+  if (ctx.sessionType !== 'Race') for (const best of line.BestLapTimes ?? []) addPair(best);
   addPair(line.BestLapTime);
 
   const lastDuration = parseFeedTime(line.LastLapTime?.Value);
   const lapNumber = line.NumberOfLaps;
-  if (lastDuration !== null && typeof lapNumber === 'number' && lapNumber >= 1) {
+  if (
+    lastDuration !== null &&
+    typeof lapNumber === 'number' &&
+    lapNumber >= 1 &&
+    plausibleLap(lapNumber, ctx)
+  ) {
     const feedSectors = line.Sectors ?? [];
     const sectors = [
       sectorTime(feedSectors[0]),
@@ -451,7 +476,8 @@ export function normalizeTiming(
   const intervals: Interval[] = [];
   const laps: Lap[] = [];
 
-  const phase = data?.SessionPart ?? ctx.qualifyingPhase;
+  // A race has no parts; a SessionPart in a race is qualifying's, still in the feed.
+  const phase = ctx.sessionType === 'Race' ? null : (data?.SessionPart ?? ctx.qualifyingPhase);
 
   for (const [driverNumber, line] of driverEntries(data?.Lines)) {
     const position = parseFeedNumber(line.Position);

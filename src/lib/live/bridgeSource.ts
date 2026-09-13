@@ -91,6 +91,9 @@ export class BridgeSource {
   #retryMs = MIN_RETRY_MS;
   #stopped = false;
   #dirty = false;
+  /** Whether the session in the feed has started; see #noteSessionStatus. */
+  #started = false;
+  #statusSessionKey: number | null = null;
 
   #state: BridgeSourceState = {
     connected: false,
@@ -215,6 +218,7 @@ export class BridgeSource {
     }
 
     if (message.type === 'snapshot' && isRecord(message.data)) {
+      this.#noteSessionStatus(message.data.SessionInfo, message.data.SessionStatus);
       /*
        * A snapshot means the bridge has (re)subscribed, so the feed state starts
        * again from scratch. The accumulator is kept: it holds everything already
@@ -234,13 +238,46 @@ export class BridgeSource {
        * one would resurrect fields the feed had cleared.
        */
       this.#feed.reset({ ...this.#feed.all(), [message.topic]: message.data });
+      if (message.topic === 'SessionStatus' || message.topic === 'SessionInfo') {
+        this.#noteSessionStatus(this.#feed.get('SessionInfo'), this.#feed.get('SessionStatus'));
+      }
       this.#fold(message.topic, message.data);
       this.#touch();
     }
   }
 
+  /**
+   * Tracks whether the race has actually started.
+   *
+   * Before the start, the feed announces the race's SessionInfo but still carries the
+   * previous session's timing — on race day 2026, qualifying's laps, bests and tyre
+   * stints, with SessionStatus "Inactive". Until "Started" (or "Aborted", a red flag
+   * after the start) arrives, a race gets its running order and nothing else, and
+   * on the start everything timing-derived gathered so far is thrown away.
+   */
+  #noteSessionStatus(info: unknown, status: unknown): void {
+    const key = (info as SessionInfo | undefined)?.Key ?? null;
+    if (key !== this.#statusSessionKey) {
+      this.#statusSessionKey = key;
+      this.#started = false;
+    }
+    const word = (status as { Status?: string } | undefined)?.Status?.trim().toLowerCase();
+    const running = word === 'started' || word === 'aborted';
+    if (running && !this.#started) {
+      this.#started = true;
+      this.#accumulator.clearTiming();
+      this.#dirty = true;
+    }
+  }
+
   #fold(topic: string, value: unknown, atIso?: string): void {
-    this.#accumulator.apply(normalizeTopic(topic, value, this.#context(atIso)));
+    let rows = normalizeTopic(topic, value, this.#context(atIso));
+    const info = this.#feed.get('SessionInfo') as SessionInfo | undefined;
+    if (info?.Type === 'Race' && !this.#started) {
+      // Pre-race: the running order only. See #noteSessionStatus.
+      rows = { ...rows, laps: undefined, stints: undefined, pits: undefined, intervals: undefined };
+    }
+    this.#accumulator.apply(rows);
     this.#dirty = true;
   }
 
@@ -253,7 +290,8 @@ export class BridgeSource {
       meetingKey: info?.Meeting?.Key ?? 0,
       atIso: atIso ?? new Date(this.#now()).toISOString(),
       lapNumber: lapCountOf(this.#feed.get('LapCount') as LapCount | undefined),
-      qualifyingPhase: timing?.SessionPart ?? null,
+      qualifyingPhase: info?.Type === 'Race' ? null : (timing?.SessionPart ?? null),
+      sessionType: info?.Type ?? null,
     };
   }
 
