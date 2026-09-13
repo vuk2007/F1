@@ -16,7 +16,7 @@ import {
   getWeather,
   type RequestOptions,
 } from './client';
-import { SESSION_PARTS, type SessionDataset, type SessionPart } from './dataset';
+import { SESSION_PARTS, sessionWindow, type SessionDataset, type SessionPart } from './dataset';
 
 export interface LoadProgress {
   /** Endpoint currently being fetched, or 'done'. */
@@ -84,7 +84,7 @@ export async function loadSession(
     intervals,
     weather,
     raceControl,
-    startMs: Date.parse(session.date_start),
-    endMs: Date.parse(session.date_end),
+    // Not date_end alone: laps started before the flag finish after it. See sessionWindow.
+    ...sessionWindow(session, laps),
   };
 }
