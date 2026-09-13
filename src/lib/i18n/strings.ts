@@ -295,6 +295,174 @@ export const strings = {
     leaderboard: 'Theoretical best by driver',
   },
 
+  /* The newcomer view. Written for someone who has never watched a race. */
+  simple: {
+    modeLabel: 'View',
+    modeSimple: 'Simple',
+    modeEngineer: 'Engineer',
+    modeHint: 'Simple explains the session in plain words; Engineer shows the full timing screen.',
+    guide: 'Guide',
+    rightNow: 'Right now',
+    story: 'Race story',
+
+    flag: {
+      green: 'Green',
+      yellow: 'Yellow flag',
+      sc: 'Safety Car',
+      vsc: 'Virtual SC',
+      red: 'Red flag',
+      chequered: 'Chequered',
+      unknown: 'Not started',
+    } as Record<string, string>,
+
+    lapOf: (lap: number, total: number) => `Lap ${lap} of ${total}`,
+    lapOnly: (lap: number) => `Lap ${lap}`,
+    notStarted: 'Not started',
+    weather: (raining: boolean, trackTemp: number | null) =>
+      `${raining ? 'raining' : 'dry'}${trackTemp == null ? '' : `, ${Math.round(trackTemp)} °C track`}`,
+
+    compoundPlural: {
+      SOFT: 'softs',
+      MEDIUM: 'mediums',
+      HARD: 'hards',
+      INTERMEDIATE: 'intermediates',
+      WET: 'wets',
+    } as Record<string, string>,
+
+    status: {
+      waiting: 'Waiting to start',
+      leading: 'Leading',
+      fastest: 'Fastest so far',
+      behind: (seconds: string) => `${seconds} s behind`,
+      offFastest: (seconds: string) => `${seconds} s off the fastest`,
+      lapped: (label: string) => {
+        const laps = Number(label.replace(/[^0-9]/g, '')) || 1;
+        return `${laps} ${laps === 1 ? 'lap' : 'laps'} down`;
+      },
+      onTyres: (age: number, compound: string) =>
+        age <= 1 ? `on new ${compound}` : `on ${age}-lap-old ${compound}`,
+      justPitted: (compound: string) => `just pitted for new ${compound}`,
+    },
+
+    badges: {
+      fastestLap: 'Fastest lap',
+      underInvestigation: 'Under investigation',
+      pitSoon: 'Pit soon',
+      undercutThreat: 'Undercut threat',
+      drsRange: 'DRS range',
+      freshTyres: 'Fresh tyres',
+    } as Record<string, string>,
+
+    cards: {
+      heading: 'Running order',
+      tapHint: 'Tap a driver to see their race in detail.',
+      selected: 'Showing below',
+      legendGap: 'Gap',
+      legendTyre: 'Tyre',
+      legendAge: 'Tyre age',
+    },
+
+    battles: {
+      heading: 'Key battles',
+      none: 'No two cars are close enough to be fighting right now.',
+      forPosition: (position: number) => `for P${position}`,
+      trend: {
+        closing: 'closing',
+        stable: 'stable',
+        opening: 'pulling away',
+        unknown: 'too early to tell',
+      } as Record<string, string>,
+      trendHint: 'Change over the last 3 laps',
+    },
+
+    rightNowText: {
+      waiting: 'The session has not started yet. Press play to begin the replay.',
+      red: 'Red flag: the session is stopped and the cars are heading back to the pit lane.',
+      sc: 'Safety car on track: the field is bunched up behind it, and a pit stop is much cheaper than usual.',
+      vsc: 'Virtual safety car: every driver has to slow down, so gaps are frozen and pit stops are cheaper.',
+      rain: 'It is raining: grip is dropping and teams may switch to wet-weather tyres.',
+      chequeredRace: (winner: string) => `Chequered flag: ${winner} wins the race.`,
+      chequeredOther: (fastest: string) => `Session over: ${fastest} set the fastest lap.`,
+      finalLaps: (lapsLeft: number, leader: string, second: string, gap: string) =>
+        lapsLeft <= 0
+          ? `Final lap: ${leader} leads ${second} by ${gap} s.`
+          : `${lapsLeft} ${lapsLeft === 1 ? 'lap' : 'laps'} to go: ${leader} leads ${second} by ${gap} s.`,
+      finalLapsAlone: (lapsLeft: number, leader: string) =>
+        lapsLeft <= 0
+          ? `Final lap: ${leader} leads.`
+          : `${lapsLeft} ${lapsLeft === 1 ? 'lap' : 'laps'} to go, and ${leader} leads.`,
+      pits: (names: string, many: boolean) =>
+        `${names} ${many ? 'are' : 'is'} in the pit lane for fresh tyres.`,
+      battle: (chaser: string, ahead: string, gap: string, position: number, trend: string) =>
+        `Closest fight: ${chaser} is ${gap} s behind ${ahead} for P${position}${
+          trend === 'closing' ? ', and closing' : trend === 'opening' ? ', but dropping back' : ''
+        }.`,
+      leaderRace: (leader: string, second: string, gap: string) =>
+        `${leader} leads the race, ${gap} s ahead of ${second}.`,
+      leaderAlone: (leader: string) => `${leader} leads the race.`,
+      fastest: (leader: string, second: string, gap: string) =>
+        `${leader} is fastest so far, ${gap} s quicker than ${second}.`,
+      fastestAlone: (leader: string) => `${leader} has the fastest lap so far.`,
+      and: 'and',
+    },
+
+    captions: {
+      notEnough: 'Not enough clean laps yet to read a trend.',
+      rising: (perLap: string, compound: string) =>
+        `Lap times going up by about ${perLap} s per lap on the ${compound}: the tyres are wearing out.`,
+      hiddenByFuel: (perLap: string, compound: string) =>
+        `The ${compound} are losing about ${perLap} s per lap, but lap times look flat because the car gets lighter as fuel burns off.`,
+      steady: (compound: string) =>
+        `Lap times holding steady on the ${compound}: no measurable tyre wear yet.`,
+      falling: (perLap: string, compound: string) =>
+        `Lap times falling by about ${perLap} s per lap on the ${compound}, usually because the track is gaining grip.`,
+      paceLeader: (fastest: string, other: string, perLap: string) =>
+        `${fastest} is quickest here, about ${perLap} s a lap faster than ${other} on a typical lap.`,
+      paceTied: (a: string, b: string) => `${a} and ${b} are matched on pace, lap for lap.`,
+      paceSingle: (driver: string, lap: string) => `A typical clean lap for ${driver} is ${lap}.`,
+      telemetryCompare: (ahead: string, behind: string, seconds: string) =>
+        `Over this lap ${ahead} finished ${seconds} s ahead of ${behind}; the Delta chart shows where it was won.`,
+      telemetryEven: (a: string, b: string) =>
+        `${a} and ${b} finished this lap level; the Delta chart shows where each gained.`,
+      telemetrySingle: (driver: string, speed: number, flatOut: number) =>
+        `${driver} reached ${speed} km/h and was flat out for ${flatOut}% of this lap.`,
+    },
+
+    onboarding: {
+      title: 'How to read this page',
+      steps: [
+        {
+          heading: 'This is the order',
+          body: 'Each card is one driver, top to bottom in their current race position. The coloured stripe is their team.',
+        },
+        {
+          heading: 'This is the gap',
+          body: 'The line under each name says how far behind the car in front they are, in seconds. Smaller means a fight.',
+        },
+        {
+          heading: 'This is the tyre',
+          body: 'The coloured circle is the tyre type (red soft, yellow medium, white hard) and the number is how many laps it has done. Older tyres are slower.',
+        },
+        {
+          heading: 'Tap a driver',
+          body: 'Tap any card to see that driver’s race in detail. Every (i) explains the number next to it.',
+        },
+      ],
+      next: 'Next',
+      back: 'Back',
+      done: 'Got it',
+      skip: 'Skip',
+      stepOf: (step: number, total: number) => `${step} of ${total}`,
+    },
+
+    explain: {
+      what: 'What it is',
+      why: 'Why it matters',
+      watch: 'What to watch for',
+      back: 'Back',
+    },
+  },
+
   common: {
     noValue: '—',
     laps: 'laps',
