@@ -16,7 +16,7 @@ import { cheapStop, type CheapStop } from './cheap-stop';
 import { IntervalLookup } from './clean-laps';
 import type { Confidence } from './confidence';
 import type { LogisticModel } from './logistic';
-import { compoundStep, overtakeChance } from './overtake';
+import { compoundStep, overtakeChance, rangeStreak } from './overtake';
 import {
   livePitLoss,
   pitForecast,
@@ -42,8 +42,13 @@ import { fitField, tyrePerformance, type TyrePerformance } from './tyre-performa
 
 export interface Calibration {
   overtake: LogisticModel;
+  /** Passes the overtake model was fitted on; see `MIN_OVERTAKE_PASSES`. */
+  overtakePasses?: number;
   q3: Q3Calibration;
 }
+
+/** Fewer passes than this in the calibration and the overtake card is graded low. */
+export const MIN_OVERTAKE_PASSES = 150;
 
 export interface BattlePrediction {
   aheadNumber: number;
@@ -228,6 +233,16 @@ export function buildPredictions(input: {
     const chaserStep = compoundStep(chaserStint?.compound);
     const age = (stint: NonNullable<typeof aheadStint>) =>
       (stint.tyre_age_at_start ?? 0) + (onLap! - stint.lap_start);
+    /* The Overtake Mode features, built as `overtakeSamples` builds them. A model without them ignores them. */
+    const streak =
+      onLap == null
+        ? 0
+        : rangeStreak((l) => {
+            const start = lapStart(chaser.driver, l);
+            return start == null || start > timeMs
+              ? null
+              : intervals.intervalAt(chaser.driver, start);
+          }, onLap);
 
     battles.push({
       aheadNumber: ahead.driver,
@@ -251,11 +266,18 @@ export function buildPredictions(input: {
                   paceDelta: Number((aheadPace - chaserPace).toFixed(3)),
                   tyreAgeDelta: age(aheadStint) - age(chaserStint),
                   compoundDelta: aheadStep - chaserStep,
+                  inRangeLastLap: streak > 0 ? 1 : 0,
+                  rangeStreak: streak,
                 },
                 calibration.overtake,
               ),
-              // A formula fitted on thousands of fights, applied to one: never more than medium.
-              confidence: 'medium',
+              // A formula fitted on thousands of fights, applied to one: never more than medium,
+              // and low when the season has not yet produced enough passes to fit it on.
+              confidence:
+                calibration.overtakePasses != null &&
+                calibration.overtakePasses < MIN_OVERTAKE_PASSES
+                  ? 'low'
+                  : 'medium',
               enough: true,
             }
           : { probability: null, confidence: 'low', enough: false },

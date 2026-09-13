@@ -26,7 +26,7 @@
  */
 import type { SessionDataset } from '@/lib/openf1/dataset';
 import { cautionPeriods, overlapsCaution } from '../caution';
-import { DEFAULT_PIT_LOSS_SECONDS, PIT_LOSS_BY_CIRCUIT } from '../pit-loss';
+import { DEFAULT_PIT_LOSS_SECONDS, pitLossTableFor } from '../pit-loss';
 import { cleanOnly, predictionLaps, type IntervalLookup } from './clean-laps';
 import type { Confidence } from './confidence';
 
@@ -171,13 +171,28 @@ function median(values: number[]): number | null {
  * slow then, so they would understate a green-flag stop.
  */
 export function livePitLoss(snapshot: SessionDataset, intervals?: IntervalLookup): LivePitLoss {
-  const tabled = PIT_LOSS_BY_CIRCUIT[snapshot.session.circuit_short_name];
+  const tabled = pitLossTableFor(snapshot.session.year)[snapshot.session.circuit_short_name];
   const fallback: LivePitLoss = {
     seconds: tabled ?? DEFAULT_PIT_LOSS_SECONDS,
     source: tabled != null ? 'circuit-table' : 'default',
     stopsMeasured: 0,
   };
 
+  const losses = measuredStopLosses(snapshot, intervals);
+  if (losses.length < OBSERVED_STOPS_NEEDED) return { ...fallback, stopsMeasured: losses.length };
+  return {
+    seconds: Number(median(losses)!.toFixed(1)),
+    source: 'observed',
+    stopsMeasured: losses.length,
+  };
+}
+
+/**
+ * Every measurable green-flag stop's loss in a session, in seconds. Shared by the
+ * live estimate above and by `pnpm pit-loss-table`, so the table and the live figure
+ * are the same measurement.
+ */
+export function measuredStopLosses(snapshot: SessionDataset, intervals?: IntervalLookup): number[] {
   const periods = cautionPeriods(snapshot.raceControl);
   const losses: number[] = [];
 
@@ -200,13 +215,7 @@ export function livePitLoss(snapshot: SessionDataset, intervals?: IntervalLookup
     // A stop that "cost" under 10 s or over 60 s was not a normal stop.
     if (loss > 10 && loss < 60) losses.push(loss);
   }
-
-  if (losses.length < OBSERVED_STOPS_NEEDED) return { ...fallback, stopsMeasured: losses.length };
-  return {
-    seconds: Number(median(losses)!.toFixed(1)),
-    source: 'observed',
-    stopsMeasured: losses.length,
-  };
+  return losses;
 }
 
 export interface PitForecast {

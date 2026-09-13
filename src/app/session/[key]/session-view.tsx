@@ -22,7 +22,7 @@ import { RightNowBanner } from '@/components/simple/RightNowBanner';
 import { ViewModeToggle } from '@/components/simple/ViewModeToggle';
 import { Predictions } from '@/components/simple/predictions/Predictions';
 import { buildPredictions } from '@/lib/models/predict/assemble';
-import { CALIBRATION } from '@/lib/models/predict/calibration';
+import { calibrationFor } from '@/lib/models/predict/calibration';
 import { regulationsFor } from '@/lib/season';
 import { lapChartCaption, paceCaption } from '@/lib/explain/captions';
 import { driverBadges, driverStatusLine } from '@/lib/explain/driver-card';
@@ -469,7 +469,7 @@ export function SessionView({
       timeMs: predictionMs,
       selectedDriver,
       rivalDriver,
-      calibration: CALIBRATION,
+      calibration: calibrationFor(dataset.session.year),
     });
   }, [viewMode, dataset, predictionMs, selectedDriver, rivalDriver]);
 

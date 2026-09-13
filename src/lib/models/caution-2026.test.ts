@@ -29,7 +29,8 @@ function message(
 }
 
 const safetyCar = { category: 'SafetyCar' } as const;
-const track = (flag: string) => ({ category: 'Flag', flag, scope: 'Track' }) as Partial<RaceControl>;
+const track = (flag: string) =>
+  ({ category: 'Flag', flag, scope: 'Track' }) as Partial<RaceControl>;
 
 describe('controlSignal', () => {
   it('reads the 2026 VSC wording as a virtual safety car, not a full one', () => {
@@ -42,22 +43,41 @@ describe('controlSignal', () => {
   });
 
   it('still reads the 2024-2025 wording', () => {
-    expect(controlSignal(message('2025-08-31T13:40:00+00:00', 'VIRTUAL SAFETY CAR DEPLOYED', safetyCar))).toBe('vsc-start');
-    expect(controlSignal(message('2025-08-31T13:40:00+00:00', 'SAFETY CAR DEPLOYED', safetyCar))).toBe('sc-start');
-    expect(controlSignal(message('2025-08-31T13:40:00+00:00', 'SAFETY CAR IN THIS LAP', safetyCar))).toBe('caution-end');
-    expect(controlSignal(message('2025-08-31T13:40:00+00:00', 'RED FLAG', track('RED')))).toBe('red');
+    expect(
+      controlSignal(message('2025-08-31T13:40:00+00:00', 'VIRTUAL SAFETY CAR DEPLOYED', safetyCar)),
+    ).toBe('vsc-start');
+    expect(
+      controlSignal(message('2025-08-31T13:40:00+00:00', 'SAFETY CAR DEPLOYED', safetyCar)),
+    ).toBe('sc-start');
+    expect(
+      controlSignal(message('2025-08-31T13:40:00+00:00', 'SAFETY CAR IN THIS LAP', safetyCar)),
+    ).toBe('caution-end');
+    expect(controlSignal(message('2025-08-31T13:40:00+00:00', 'RED FLAG', track('RED')))).toBe(
+      'red',
+    );
   });
 
   it('reads a red flag sent as a plain message, but not one mentioned in a penalty', () => {
-    expect(controlSignal(message('2026-09-06T13:07:43+00:00', 'RED FLAG - RACE SUSPENDED'))).toBe('red');
+    expect(controlSignal(message('2026-09-06T13:07:43+00:00', 'RED FLAG - RACE SUSPENDED'))).toBe(
+      'red',
+    );
     expect(
-      controlSignal(message('2026-06-01T13:00:00+00:00', 'INCIDENT INVOLVING CAR 6 (HAD) NOTED - RED FLAG INFRINGEMENT')),
+      controlSignal(
+        message(
+          '2026-06-01T13:00:00+00:00',
+          'INCIDENT INVOLVING CAR 6 (HAD) NOTED - RED FLAG INFRINGEMENT',
+        ),
+      ),
     ).toBeNull();
   });
 
   it('ignores safety car chatter that is neither a start nor an end', () => {
     expect(controlSignal(message('2026-09-06T13:34:00+00:00', 'SAFETY CAR LIGHTS ON'))).toBeNull();
-    expect(controlSignal(message('2025-08-31T13:40:00+00:00', 'SAFETY CAR THROUGH THE PIT LANE', safetyCar))).toBeNull();
+    expect(
+      controlSignal(
+        message('2025-08-31T13:40:00+00:00', 'SAFETY CAR THROUGH THE PIT LANE', safetyCar),
+      ),
+    ).toBeNull();
   });
 });
 

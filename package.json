@@ -18,7 +18,8 @@
     "bridge:capture": "node bridge/src/capture.ts",
     "typecheck:bridge": "tsc --noEmit -p bridge",
     "calibrate": "node --import ./scripts/register-aliases.mjs scripts/calibrate.ts",
-    "hit-rates": "node --import ./scripts/register-aliases.mjs scripts/hit-rates.ts"
+    "hit-rates": "node --import ./scripts/register-aliases.mjs scripts/hit-rates.ts",
+    "pit-loss-table": "node --import ./scripts/register-aliases.mjs scripts/pit-loss-table.ts"
   },
   "dependencies": {
     "idb": "^8.0.3",

@@ -2,7 +2,7 @@
  * Card 5 — overtake chance: a rough probability that the chasing car is ahead
  * within five laps.
  *
- * A logistic combination of four things that decide an on-track pass:
+ * A logistic combination of the things that decide an on-track pass:
  *
  *  - **gap**: seconds between the cars now
  *  - **pace delta**: how much quicker the chaser has been over the last three laps
@@ -10,18 +10,28 @@
  *  - **compound delta**: how many steps softer the chaser's compound is (soft 1,
  *    medium 2, hard 3)
  *
- * The weights are not chosen by hand. `pnpm calibrate` builds every such situation
- * from the 2024 and 2025 dry races — two cars adjacent on the road within three
- * seconds, at the start of a lap — labels whether the chaser was ahead at the start
- * of any of the next five laps, and fits the weights to those outcomes. Situations
- * where either car stopped, or a safety car ran, inside the window are left out:
- * those change the order without an overtake, and the card is about racing.
+ * and from 2026, two more, because Overtake Mode energy can be saved across laps:
  *
- * The races the prediction tests are scored on are held out of that fit, so the
- * hit rate is measured on races the model has not seen.
+ *  - **in range last lap**: whether the chaser started the previous lap within one
+ *    second, earning Overtake Mode
+ *  - **range streak**: how many laps in a row, up to five, it has been in range
+ *
+ * The weights are not chosen by hand. `pnpm calibrate` builds every such situation
+ * from dry races — two cars adjacent on the road within three seconds, at the start
+ * of a lap — labels whether the chaser was ahead at the start of any of the next
+ * five laps, and fits the weights to those outcomes. Situations where either car
+ * stopped, or a safety car ran, inside the window are left out: those change the
+ * order without an overtake, and the card is about racing.
+ *
+ * The eras are never mixed. 2024-2025 races fit the four-feature model used for
+ * replays up to 2025; `pnpm calibrate --season 2026` fits the six-feature model on
+ * 2026 races alone, where a pass also has to appear in OpenF1's `/overtakes` feed
+ * between the same two cars. The races the tests score are held out of both fits.
  */
 import type { SessionDataset } from '@/lib/openf1/dataset';
+import type { Overtake } from '@/lib/openf1/types';
 import { toTimed, valueAt } from '@/lib/replay/timeline';
+import { ATTACK_RANGE_S } from '@/lib/season';
 import { cautionPeriods, overlapsCaution } from '../caution';
 import { IntervalLookup } from './clean-laps';
 import { predictProbability, type LogisticModel } from './logistic';
@@ -29,7 +39,11 @@ import { predictProbability, type LogisticModel } from './logistic';
 export const OVERTAKE_HORIZON_LAPS = 5;
 /** Cars further apart than this are not treated as fighting. */
 export const OVERTAKE_MAX_GAP_S = 3;
+/** Longest run of laps in range the streak feature counts. */
+export const MAX_RANGE_STREAK = 5;
+
 export const FEATURE_NAMES = ['gap', 'paceDelta', 'tyreAgeDelta', 'compoundDelta'] as const;
+export const FEATURE_NAMES_2026 = [...FEATURE_NAMES, 'inRangeLastLap', 'rangeStreak'] as const;
 
 export interface OvertakeFeatures {
   gap: number;
@@ -39,10 +53,19 @@ export interface OvertakeFeatures {
   tyreAgeDelta: number;
   /** Steps softer the chaser's compound is. */
   compoundDelta: number;
+  /** 1 when the chaser started the previous lap within one second. */
+  inRangeLastLap?: number;
+  /** Consecutive laps, up to five, the chaser started within one second. */
+  rangeStreak?: number;
 }
 
-export function featureVector(f: OvertakeFeatures): number[] {
-  return [f.gap, f.paceDelta, f.tyreAgeDelta, f.compoundDelta];
+/** The features in the order a model was fitted with; a feature it lacks counts as 0. */
+export function featureVector(
+  f: OvertakeFeatures,
+  names: readonly string[] = FEATURE_NAMES,
+): number[] {
+  const values = f as unknown as Record<string, number | undefined>;
+  return names.map((name) => values[name] ?? 0);
 }
 
 /** Soft 1, medium 2, hard 3; wet-weather tyres are outside what the model knows. */
@@ -60,7 +83,25 @@ export function compoundStep(compound: string | null | undefined): number | null
 }
 
 export function overtakeChance(features: OvertakeFeatures, model: LogisticModel): number {
-  return predictProbability(model, featureVector(features));
+  return predictProbability(model, featureVector(features, model.featureNames));
+}
+
+/**
+ * Laps in a row, counting back from the lap before `lap`, that the chaser started
+ * within the one-second attack range. `intervalAtLapStart` gives the chaser's
+ * interval at the start of a lap, or null when unknown — which ends the streak.
+ */
+export function rangeStreak(
+  intervalAtLapStart: (lap: number) => number | null,
+  lap: number,
+): number {
+  let streak = 0;
+  for (let k = 1; k <= MAX_RANGE_STREAK; k += 1) {
+    const interval = intervalAtLapStart(lap - k);
+    if (interval == null || interval <= 0 || interval > ATTACK_RANGE_S) break;
+    streak += 1;
+  }
+  return streak;
 }
 
 export interface OvertakeSample {
@@ -84,8 +125,17 @@ function median(values: number[]): number | null {
  *
  * Features use only laps before the lap in question and the label only the laps
  * after it, so a sample never contains its own answer.
+ *
+ * With `overtakes`, a pass must also appear in that feed — the chaser recorded
+ * overtaking that same car inside the window. On its own the feed counts every
+ * position exchange, including the start and restarts (Monza 2026: 334 rows, over a
+ * hundred in the first four minutes), so it confirms the position label rather than
+ * replacing it.
  */
-export function overtakeSamples(dataset: SessionDataset): OvertakeSample[] {
+export function overtakeSamples(
+  dataset: SessionDataset,
+  options: { overtakes?: Overtake[] } = {},
+): OvertakeSample[] {
   const periods = cautionPeriods(dataset.raceControl);
   const intervals = new IntervalLookup(dataset.intervals);
 
@@ -130,6 +180,17 @@ export function overtakeSamples(dataset: SessionDataset): OvertakeSample[] {
     dataset.stints.find(
       (s) => s.driver_number === driver && lap >= s.lap_start && lap <= s.lap_end,
     );
+
+  const confirmedPass = (chaser: number, ahead: number, fromMs: number, toMs: number) =>
+    (options.overtakes ?? []).some((o) => {
+      const at = Date.parse(o.date);
+      return (
+        o.overtaking_driver_number === chaser &&
+        o.overtaken_driver_number === ahead &&
+        at >= fromMs &&
+        at <= toMs
+      );
+    });
 
   const samples: OvertakeSample[] = [];
   const drivers = [...positions.keys()];
@@ -195,6 +256,12 @@ export function overtakeSamples(dataset: SessionDataset): OvertakeSample[] {
           break;
         }
       }
+      if (label === 1 && options.overtakes && !confirmedPass(chaser, ahead, now, end)) label = 0;
+
+      const streak = rangeStreak((l) => {
+        const start = lapStart.get(`${chaser}:${l}`);
+        return start == null ? null : intervals.intervalAt(chaser, start);
+      }, lap);
 
       samples.push({
         features: {
@@ -202,6 +269,8 @@ export function overtakeSamples(dataset: SessionDataset): OvertakeSample[] {
           paceDelta: Number((aheadPace - chaserPace).toFixed(3)),
           tyreAgeDelta: age(aheadStint) - age(chaserStint),
           compoundDelta: aheadStep - chaserStep,
+          inRangeLastLap: streak > 0 ? 1 : 0,
+          rangeStreak: streak,
         },
         label,
         lap,

@@ -5,3 +5,4 @@ bridge/fixtures
 src/lib/models/predict/__fixtures__
 recordings
 src/lib/models/predict/calibration.json
+src/lib/models/predict/calibration-2026.json

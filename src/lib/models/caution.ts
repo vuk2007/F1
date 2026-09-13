@@ -30,13 +30,7 @@ export interface CautionPeriod {
  * so the prediction models and the flag on screen cannot disagree.
  */
 export type ControlSignal =
-  | 'sc-start'
-  | 'vsc-start'
-  | 'caution-end'
-  | 'red'
-  | 'green'
-  | 'yellow'
-  | 'chequered';
+  'sc-start' | 'vsc-start' | 'caution-end' | 'red' | 'green' | 'yellow' | 'chequered';
 
 export function controlSignal(message: RaceControl): ControlSignal | null {
   const text = message.message.toUpperCase();

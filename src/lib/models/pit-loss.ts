@@ -13,6 +13,8 @@
  * refined against real data later.
  */
 import type { SessionDataset } from '@/lib/openf1/dataset';
+import { regulationsFor } from '@/lib/season';
+import { MEASURED_PIT_LOSS } from './pit-loss-table';
 
 /** Used whenever the circuit is not in the table. */
 export const DEFAULT_PIT_LOSS_SECONDS = 22;
@@ -23,9 +25,9 @@ export const DEFAULT_PIT_LOSS_SECONDS = 22;
  */
 export const PIT_LOSS_BY_CIRCUIT: Record<string, number> = {
   Monza: 21,
-  Spa: 19,
+  'Spa-Francorchamps': 19,
   Silverstone: 21,
-  Monaco: 19,
+  'Monte Carlo': 19,
   Zandvoort: 21,
   Sakhir: 22,
   Jeddah: 20,
@@ -35,9 +37,9 @@ export const PIT_LOSS_BY_CIRCUIT: Record<string, number> = {
   Miami: 20,
   Imola: 27,
   Montreal: 18,
-  Barcelona: 21,
-  'Red Bull Ring': 20,
-  Budapest: 20,
+  Catalunya: 21,
+  Spielberg: 20,
+  Hungaroring: 20,
   Baku: 20,
   Singapore: 25,
   Austin: 22,
@@ -45,8 +47,27 @@ export const PIT_LOSS_BY_CIRCUIT: Record<string, number> = {
   Interlagos: 21,
   'Las Vegas': 20,
   Lusail: 25,
-  'Yas Marina': 22,
+  'Yas Marina Circuit': 22,
 };
+
+/**
+ * The pit loss table for a session's season.
+ *
+ * From 2026, only figures measured on 2026 races: the cars changed, and a 2025 pit
+ * loss is not evidence about a 2026 one, so a circuit with no 2026 race yet falls
+ * back to the default rather than to an older season. Up to 2025, the figures
+ * measured on 2024-2025 races win over the quoted ones above where both exist.
+ * `pnpm pit-loss-table` produces the measured figures.
+ */
+export function pitLossTableFor(year: number | null | undefined): Record<string, number> {
+  const measured = (era: '2024-2025' | '2026') =>
+    Object.fromEntries(
+      Object.entries(MEASURED_PIT_LOSS[era]).map(([circuit, m]) => [circuit, m.seconds]),
+    );
+  return regulationsFor(year) === 'overtake-mode'
+    ? measured('2026')
+    : { ...PIT_LOSS_BY_CIRCUIT, ...measured('2024-2025') };
+}
 
 export interface PitLossEstimate {
   /** Seconds lost by pitting, from the table or the default. */
@@ -67,7 +88,7 @@ function median(values: number[]): number | null {
 
 export function estimatePitLoss(dataset: SessionDataset): PitLossEstimate {
   const circuit = dataset.session.circuit_short_name;
-  const tabled = PIT_LOSS_BY_CIRCUIT[circuit];
+  const tabled = pitLossTableFor(dataset.session.year)[circuit];
 
   const laneDurations = dataset.pits
     .map((p) => p.lane_duration)

@@ -1,9 +1,14 @@
 /**
- * Fits the numbers two prediction cards depend on, from real 2024 and 2025 data.
+ * Fits the numbers two prediction cards depend on, from real race data.
  *
- *   pnpm calibrate
+ *   pnpm calibrate                  2024 and 2025 -> calibration.json
+ *   pnpm calibrate --season 2026    2026 only     -> calibration-2026.json
  *
- * Writes src/lib/models/predict/calibration.json with:
+ * The eras are never mixed. 2026 changed the cars, the tyres and the overtaking aid
+ * (Overtake Mode instead of DRS), so coefficients fitted on 2024-2025 say nothing
+ * reliable about a 2026 race, and the app loads the file for the session's season.
+ *
+ * Each file holds:
  *
  *  - **overtake**: logistic weights for the overtake chance. Every dry race is
  *    downloaded and every fight in it becomes a sample — two cars adjacent on the
@@ -11,7 +16,8 @@
  *    chaser was ahead within five laps. Samples where either car stopped or a
  *    caution ran inside the window are left out (see `overtakeSamples`). Wet races
  *    are skipped: rain changes what decides a pass, and the model has no rain
- *    feature to account for it.
+ *    feature. For 2026 the model adds the two Overtake Mode features, and a pass
+ *    must also appear in OpenF1's /overtakes feed between the same two cars.
  *  - **q3Cutoff**: the median amount the Q2 tenth-best lap beats the FP3 tenth-best,
  *    at every weekend that had both (sprint weekends have no FP3).
  *
@@ -25,18 +31,48 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sessionWindow, type SessionDataset } from '@/lib/openf1/dataset';
-import type { Session } from '@/lib/openf1/types';
+import type { Overtake, Session } from '@/lib/openf1/types';
 import { fitLogistic, logLoss } from '@/lib/models/predict/logistic';
-import { FEATURE_NAMES, featureVector, overtakeSamples } from '@/lib/models/predict/overtake';
+import {
+  FEATURE_NAMES,
+  FEATURE_NAMES_2026,
+  featureVector,
+  overtakeSamples,
+} from '@/lib/models/predict/overtake';
 import { q3Cutoff, tenthBestLap } from '@/lib/models/predict/practice-forecast';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE = path.join(ROOT, 'node_modules/.cache/pit-wall-calibration');
-const OUT = path.join(ROOT, 'src/lib/models/predict/calibration.json');
 const BASE = 'https://api.openf1.org/v1';
 
+/* --season 2026 or --season=2026 */
+const seasonFlag = process.argv.findIndex(
+  (arg) => arg === '--season' || arg.startsWith('--season='),
+);
+const season =
+  seasonFlag === -1
+    ? null
+    : Number(
+        process.argv[seasonFlag]!.includes('=')
+          ? process.argv[seasonFlag]!.split('=')[1]
+          : process.argv[seasonFlag + 1],
+      );
+if (season != null && !(season >= 2023 && season <= 2100)) {
+  throw new Error('Usage: pnpm calibrate [--season 2026]');
+}
+
+const MODERN = season != null && season >= 2026;
+const YEARS = season != null ? [season] : [2024, 2025];
+const LABEL = YEARS.join('-');
+const OUT = path.join(
+  ROOT,
+  'src/lib/models/predict',
+  MODERN ? `calibration-${season}.json` : 'calibration.json',
+);
+const FEATURES: readonly string[] = MODERN ? FEATURE_NAMES_2026 : FEATURE_NAMES;
+
 /** Scored by the prediction tests; never used for fitting. */
-const HELD_OUT_SESSIONS = new Set([9912, 10014, 9920]);
+const HELD_OUT_SESSIONS = new Set(MODERN ? [11361, 11280] : [9912, 10014, 9920]);
 const HELD_OUT_MEETINGS = new Set<number>();
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -105,7 +141,7 @@ const wet = (dataset: SessionDataset) =>
 
 const now = Date.now();
 const races: Session[] = [];
-for (const year of [2024, 2025]) {
+for (const year of YEARS) {
   for (const s of await get<Session>(`sessions?year=${year}&session_name=Race`)) {
     if (Date.parse(s.date_end) < now && !s.is_cancelled) races.push(s);
   }
@@ -114,7 +150,7 @@ for (const s of races)
   if (HELD_OUT_SESSIONS.has(s.session_key)) HELD_OUT_MEETINGS.add(s.meeting_key);
 
 console.log(
-  `${races.length} races in 2024-2025; holding out ${HELD_OUT_SESSIONS.size} for the tests`,
+  `${races.length} races in ${LABEL}; holding out ${HELD_OUT_SESSIONS.size} for the tests`,
 );
 
 /* ---- Overtake chance ---- */
@@ -135,9 +171,12 @@ for (const race of races) {
     console.log(`  skip ${label}: wet`);
     continue;
   }
-  const samples = overtakeSamples(dataset);
+  const overtakes = MODERN
+    ? await get<Overtake>(`overtakes?session_key=${race.session_key}`)
+    : undefined;
+  const samples = overtakeSamples(dataset, { overtakes });
   for (const sample of samples) {
-    rows.push(featureVector(sample.features));
+    rows.push(featureVector(sample.features, FEATURES));
     labels.push(sample.label);
   }
   used.push(label);
@@ -146,14 +185,18 @@ for (const race of races) {
   );
 }
 
-const fit = fitLogistic(rows, labels, [...FEATURE_NAMES], { l2: 0.01 });
-const baseRate = labels.reduce((s, y) => s + y, 0) / labels.length;
+const fit = fitLogistic(rows, labels, [...FEATURES], { l2: 0.01 });
+const passes = labels.filter((y) => y === 1).length;
+const baseRate = passes / labels.length;
 const baseLogLoss = logLoss(
   labels.map(() => baseRate),
   labels,
 );
 console.log(
-  `\novertake: ${rows.length} samples, pass rate ${(baseRate * 100).toFixed(1)}%, log loss ${fit.logLoss.toFixed(4)} vs ${baseLogLoss.toFixed(4)} for the base rate`,
+  `\novertake: ${rows.length} samples, ${passes} passes (${(baseRate * 100).toFixed(1)}%), log loss ${fit.logLoss.toFixed(4)} vs ${baseLogLoss.toFixed(4)} for the base rate`,
+);
+fit.featureNames.forEach((name, i) =>
+  console.log(`  ${name}: weight ${fit.weights[i]!.toFixed(3)} (standardised)`),
 );
 
 /* ---- Q3 cut-off improvement ---- */
@@ -187,8 +230,8 @@ const spread = deviations.length ? deviations[Math.floor(deviations.length / 2)]
 
 const calibration = {
   generatedAt: new Date().toISOString(),
-  method:
-    'Overtake: logistic regression (Newton, L2 0.01, standardised features) on every adjacent pair within 3.0 s at a lap start in dry 2024-2025 races; label = chaser ahead at the start of any of the next 5 laps; samples with a stop or caution inside the window excluded. Q3 cut-off: median over weekends of (FP3 tenth-best lap - Q2 tenth-best lap); spread is the median absolute deviation. Sessions 9912, 10014 and 9920 (and their weekends) held out for the prediction tests.',
+  season: LABEL,
+  method: `Overtake: logistic regression (Newton, L2 0.01, standardised features ${FEATURES.join(', ')}) on every adjacent pair within 3.0 s at a lap start in dry ${LABEL} races; label = chaser ahead at the start of any of the next 5 laps${MODERN ? ', confirmed by a matching row in OpenF1 /overtakes' : ''}; samples with a stop or caution inside the window excluded. Q3 cut-off: median over weekends of (FP3 tenth-best lap - Q2 tenth-best lap); spread is the median absolute deviation. Sessions ${[...HELD_OUT_SESSIONS].join(', ')} (and their weekends) held out for the prediction tests.`,
   overtake: {
     featureNames: fit.featureNames,
     means: fit.means,
@@ -196,7 +239,7 @@ const calibration = {
     weights: fit.weights,
     bias: fit.bias,
     samples: rows.length,
-    passes: labels.filter((y) => y === 1).length,
+    passes,
     baseRate,
     logLoss: fit.logLoss,
     baseLogLoss,

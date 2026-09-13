@@ -58,7 +58,7 @@ export const METHODS = {
     computed:
       'A formula weighing the gap, the pace difference over the last three laps, the difference in tyre age and in tyre type. The weights were fitted on every close fight in the dry 2024 and 2025 races, leaving out passes caused by pit stops or safety cars.',
     trust:
-      'It is a probability, not a call: 30% means it happens in about three fights out of ten. Fitted on 11,126 fights with 1,438 passes. On three 2025 races it left out, its chances were 29% closer to what happened than always guessing the usual 13%. Gap and pace matter most; the tyre type adds little once tyre age is known. Rain is outside what it was fitted on.',
+      'It is a probability, not a call: 30% means it happens in about three fights out of ten. Fitted on 11,126 fights with 1,438 passes. On three 2025 races it left out, its chances were 29% closer to what happened than always guessing the usual 13%. Gap and pace matter most; the tyre type adds little once tyre age is known. Rain is outside what it was fitted on. For 2026 races a separate model is used, fitted only on 2026: 2,153 fights and 321 passes from 10 dry races, with two more inputs for Overtake Mode, whether the chaser was in range last lap and for how many laps in a row. Its error was 18% lower than always guessing the 2026 pass rate of 15%; the extra inputs add little so far.',
   },
   strategyBattle: {
     title: 'Pit strategy battle',

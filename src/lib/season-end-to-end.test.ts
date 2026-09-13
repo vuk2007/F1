@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { badgeLabel, driverBadges } from '@/lib/explain/driver-card';
 import { rightNow } from '@/lib/explain/right-now';
 import { buildPredictions } from '@/lib/models/predict/assemble';
-import { CALIBRATION } from '@/lib/models/predict/calibration';
+import { calibrationFor } from '@/lib/models/predict/calibration';
 import { loadFixture, type FixtureName } from '@/lib/models/predict/fixtures';
 import { raceDistance } from '@/lib/models/race-distance';
 import { driversInPitLane, keyBattles } from '@/lib/replay/battles';
@@ -86,11 +86,15 @@ for (const { name, year, regulations, lap } of CASES) {
         timeMs,
         selectedDriver: rows[3]!.driver.driver_number,
         rivalDriver: null,
-        calibration: CALIBRATION,
+        calibration: calibrationFor(year),
       });
       if (p.kind !== 'race') throw new Error('expected race predictions');
 
       expect(p.regulations).toBe(regulations);
+      // Each era gets only its own coefficients: 2026 has the two Overtake Mode features.
+      expect(calibrationFor(year).overtake.featureNames).toHaveLength(
+        regulations === 'overtake-mode' ? 6 : 4,
+      );
       expect(p.totalLaps).toBe(raceDistance(dataset));
       expect(p.tyres.compounds.some((c) => c.enough)).toBe(true);
       expect(p.driver?.label).toBe(rows[3]!.driver.name_acronym);

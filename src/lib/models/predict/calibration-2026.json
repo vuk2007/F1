@@ -1,0 +1,111 @@
+{
+  "generatedAt": "2026-09-13T12:10:53.021Z",
+  "season": "2026",
+  "method": "Overtake: logistic regression (Newton, L2 0.01, standardised features gap, paceDelta, tyreAgeDelta, compoundDelta, inRangeLastLap, rangeStreak) on every adjacent pair within 3.0 s at a lap start in dry 2026 races; label = chaser ahead at the start of any of the next 5 laps, confirmed by a matching row in OpenF1 /overtakes; samples with a stop or caution inside the window excluded. Q3 cut-off: median over weekends of (FP3 tenth-best lap - Q2 tenth-best lap); spread is the median absolute deviation. Sessions 11361, 11280 (and their weekends) held out for the prediction tests.",
+  "overtake": {
+    "featureNames": [
+      "gap",
+      "paceDelta",
+      "tyreAgeDelta",
+      "compoundDelta",
+      "inRangeLastLap",
+      "rangeStreak"
+    ],
+    "means": [
+      1.3101555968416152,
+      -0.040049233627496475,
+      0.49140733859730606,
+      -0.030654900139340455,
+      0.42823966558290755,
+      1.2679981421272644
+    ],
+    "stds": [
+      0.7294952007847465,
+      0.6172294715264153,
+      5.87523521031131,
+      0.5163273680919721,
+      0.49482365990759813,
+      1.7625358942288685
+    ],
+    "weights": [
+      -1.0464076755191627,
+      0.7805906802511837,
+      0.06971384421175149,
+      0.01377217439879627,
+      -0.06333906752648776,
+      0.1452210966628501
+    ],
+    "bias": -2.297751612702057,
+    "samples": 2153,
+    "passes": 321,
+    "baseRate": 0.14909428704133768,
+    "logLoss": 0.3441710838176807,
+    "baseLogLoss": 0.42113481487779775,
+    "races": [
+      "2026 Melbourne",
+      "2026 Shanghai",
+      "2026 Suzuka",
+      "2026 Montréal",
+      "2026 Monte Carlo",
+      "2026 Barcelona",
+      "2026 Spielberg",
+      "2026 Silverstone",
+      "2026 Spa-Francorchamps",
+      "2026 Budapest"
+    ],
+    "skipped": [
+      "2026 Miami Gardens (held out)",
+      "2026 Zandvoort (wet)",
+      "2026 Monza (held out)"
+    ]
+  },
+  "q3Cutoff": {
+    "medianImprovement": 0.926,
+    "spread": 0.32599999999999996,
+    "weekends": 7,
+    "detail": [
+      {
+        "weekend": "2026 Melbourne",
+        "fp3Tenth": 80.778,
+        "q2Tenth": 80.221,
+        "improvement": 0.557
+      },
+      {
+        "weekend": "2026 Suzuka",
+        "fp3Tenth": 91.082,
+        "q2Tenth": 90.109,
+        "improvement": 0.973
+      },
+      {
+        "weekend": "2026 Monte Carlo",
+        "fp3Tenth": 74.05,
+        "q2Tenth": 73.762,
+        "improvement": 0.288
+      },
+      {
+        "weekend": "2026 Barcelona",
+        "fp3Tenth": 77.02,
+        "q2Tenth": 75.768,
+        "improvement": 1.252
+      },
+      {
+        "weekend": "2026 Spielberg",
+        "fp3Tenth": 68.109,
+        "q2Tenth": 67.183,
+        "improvement": 0.926
+      },
+      {
+        "weekend": "2026 Spa-Francorchamps",
+        "fp3Tenth": 107.096,
+        "q2Tenth": 106.082,
+        "improvement": 1.014
+      },
+      {
+        "weekend": "2026 Budapest",
+        "fp3Tenth": 79.16,
+        "q2Tenth": 78.639,
+        "improvement": 0.521
+      }
+    ]
+  }
+}

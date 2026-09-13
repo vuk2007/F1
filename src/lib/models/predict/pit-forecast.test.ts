@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeFixture } from '@/lib/replay/fixture';
+import { pitLossTableFor } from '../pit-loss';
 import {
   livePitLoss,
   optimalStops,
@@ -164,10 +165,22 @@ describe('rejoinIfPitNow', () => {
 });
 
 describe('livePitLoss', () => {
-  it('uses the circuit table before any stop has been seen', () => {
+  it('uses the circuit table for the session’s season before any stop has been seen', () => {
     const loss = livePitLoss(makeFixture());
     expect(loss.source).toBe('circuit-table');
-    expect(loss.seconds).toBe(21);
+    // The fixture is Monza 2025: the 2024-2025 measured figure, not a 2026 one.
+    expect(loss.seconds).toBe(pitLossTableFor(2025).Monza);
+  });
+
+  it('never uses an earlier season’s figure for a 2026 circuit with no 2026 race yet', () => {
+    const base = makeFixture();
+    const madrid = {
+      ...base,
+      session: { ...base.session, year: 2026, circuit_short_name: 'Madring' },
+    };
+    expect(livePitLoss(madrid)).toMatchObject({ source: 'default', seconds: 22 });
+    expect(pitLossTableFor(2026).Monza).toBeUndefined();
+    expect(pitLossTableFor(2025).Monza).toBeGreaterThan(15);
   });
 
   it('switches to the loss this session measured once two green-flag stops are in', () => {

@@ -22,12 +22,7 @@ export const FRESH_TYRE_LAPS = 3;
  * Overtake Mode range from 2026. One badge, named for the era — see `season.ts`.
  */
 export type BadgeKind =
-  | 'fastestLap'
-  | 'underInvestigation'
-  | 'pitSoon'
-  | 'undercutThreat'
-  | 'attackRange'
-  | 'freshTyres';
+  'fastestLap' | 'underInvestigation' | 'pitSoon' | 'undercutThreat' | 'attackRange' | 'freshTyres';
 
 /** Highest priority first: when more than two apply, these win. */
 export const BADGE_PRIORITY: BadgeKind[] = [

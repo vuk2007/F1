@@ -561,7 +561,8 @@ export const strings = {
         rangeIn: (range: string, laps: number) =>
           `${range.charAt(0).toUpperCase()}${range.slice(1)} in about ${laps} ${laps === 1 ? 'lap' : 'laps'}`,
         notBeforeEnd: (range: string) => `Not ${range} before the end`,
-        omNextLap: (available: boolean) => `Overtake Mode available next lap: ${available ? 'yes' : 'no'}`,
+        omNextLap: (available: boolean) =>
+          `Overtake Mode available next lap: ${available ? 'yes' : 'no'}`,
         overtake: (percent: number) => `${percent}% chance of a pass within 5 laps`,
       },
 
