@@ -108,3 +108,35 @@ describe('buildPredictions', () => {
     },
   );
 });
+
+describe('overtake chance around pit stops', () => {
+  it(
+    'says nothing for a fight where either car stopped in the last three laps',
+    { timeout: 120_000 },
+    () => {
+      const dataset = loadFixture('monza-2025-race');
+      for (let lap = 8; lap <= 50; lap += 3) {
+        const at = leaderLapStart('monza-2025-race', lap);
+        const p = buildPredictions({
+          dataset,
+          timeMs: at,
+          selectedDriver: null,
+          rivalDriver: null,
+          calibration,
+        });
+        if (p.kind !== 'race') continue;
+        for (const battle of p.battles) {
+          if (battle.overtake.probability == null) continue;
+          const stopped = dataset.pits.some(
+            (pit) =>
+              (pit.driver_number === battle.aheadNumber ||
+                pit.driver_number === battle.chaserNumber) &&
+              Date.parse(pit.date) <= at &&
+              pit.lap_number >= lap - 3,
+          );
+          expect(stopped, `lap ${lap}: ${battle.chaserLabel} on ${battle.aheadLabel}`).toBe(false);
+        }
+      }
+    },
+  );
+});

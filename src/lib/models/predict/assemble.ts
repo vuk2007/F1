@@ -234,6 +234,17 @@ export function buildPredictions(input: {
     const chaserPace = onLap == null ? null : recentPace(chaser.driver, onLap);
     const aheadStep = compoundStep(aheadStint?.compound);
     const chaserStep = compoundStep(chaserStint?.compound);
+    /*
+     * A stop in the last three laps puts an in- or out-lap into the recent pace and
+     * makes one car look seconds a lap faster. The calibration drops those fights, so
+     * the card does too: Monza 2025 showed a 99% "pass" that was the car ahead pitting.
+     */
+    const pittedRecently = (n: number) =>
+      onLap != null &&
+      snapshot.pits.some(
+        (p) => p.driver_number === n && p.lap_number >= onLap - 3 && p.lap_number <= onLap,
+      );
+    const recentStop = pittedRecently(ahead.driver) || pittedRecently(chaser.driver);
     const age = (stint: NonNullable<typeof aheadStint>) =>
       (stint.tyre_age_at_start ?? 0) + (onLap! - stint.lap_start);
     /* The Overtake Mode features, built as `overtakeSamples` builds them. A model without them ignores them. */
@@ -256,6 +267,7 @@ export function buildPredictions(input: {
       gap,
       forecast,
       overtake:
+        !recentStop &&
         aheadPace != null &&
         chaserPace != null &&
         aheadStep != null &&

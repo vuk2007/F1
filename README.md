@@ -253,6 +253,47 @@ the day-versus-night reason above. Both cards say so in their (i).
   (right-now banner, race story, driver cards, key battles, onboarding), and eight prediction
   cards with calibrated coefficients and measured hit rates — see [Predictions](#predictions).
 
+## 2026 regulations
+
+2026 replaced DRS with Overtake Mode, Boost Mode and Active Aero. Replays of 2023-2025 still
+say DRS, because those cars had it; a 2026 session never does (`lib/season.ts` decides the era
+from the session year).
+
+**What the 2026 data actually contains**, checked against real OpenF1 responses before any
+code was written (Melbourne 11234 and Monza 11361 races, Monza qualifying 11357):
+
+- `car_data` has the same fields as 2025, including `drs`, which is `null` in every 2026 row
+  sampled (about 14,700). Nothing replaced it: there is no field for Overtake Mode, Boost or
+  Active Aero. `laps` and `stints` are unchanged.
+- Race control sends `OVERTAKE ENABLED` / `OVERTAKE DISABLED`, the successor of
+  `DRS ENABLED`. That is the only first-hand record of the mode and is used as such.
+- The wording of cautions changed: `VSC DEPLOYED` / `VSC ENDING` instead of
+  `VIRTUAL SAFETY CAR ...`, and red flags can arrive as a plain `RED FLAG - RACE SUSPENDED`.
+  Matched on the old wording, Monza 2026's lap-3 safety car "lasted" 26 laps and every
+  prediction lost its clean laps. `controlSignal()` now reads both.
+- `/overtakes` exists, but counts every position exchange including starts, restarts and pit
+  stops, so it only ever confirms a pass that the positions already show.
+- The live feed's `CarData.z` could not be checked from a snapshot, since an idle feed does not
+  send it. It is checked from the first 2026 race recorded by the bridge.
+
+**Energy use is estimated, never shown as fact.** With no mode field, `lib/models/energy.ts`
+guesses from speed, throttle and brake at ~3.7 Hz: likely lift and coast (throttle off near top
+speed before braking, at least two samples), likely Boost or Overtake Mode (100 m+ clearly
+faster than the driver's fastest lap on no more throttle) and likely Straight mode (speed still
+rising where the reference had levelled off). On the same Monza laps, a 2026 car lifted 8 times
+in 5 laps where 2025 cars did once. Telemetry shows them as grey, labelled "likely" markers;
+card 9, Energy story, reads a driver as Conserving, Balanced or Attacking, always at low
+confidence.
+
+**Coefficients are per era.** `pnpm calibrate --season 2026` fits the overtake model on 2026
+races only (2,153 fights, 321 passes from 10 dry races; Monza and Miami held out), adding
+whether the chaser was in Overtake Mode range last lap and for how many laps in a row. On the
+held-out Monza 2026 race its Brier score was 17.9% better than the base rate, and better than
+the 2024-2025 model on the same race (0.234 against 0.251). The 2026 Q3 cut-off median is
+0.93 s over 7 weekends. `pnpm pit-loss-table` measures pit loss per circuit from each era's
+races; it also fixed six circuits whose hand-written keys ("Spa", "Monaco", "Yas Marina"...)
+never matched OpenF1's names. A 2026 session only ever loads 2026 figures.
+
 ## Beyond the brief
 
 Two additions that fell out of having the data already typed and verified:
