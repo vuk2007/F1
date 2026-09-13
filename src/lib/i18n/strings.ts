@@ -216,6 +216,17 @@ export const strings = {
     loading: 'Loading telemetry for this lap...',
     loadingComparison: 'Loading the comparison lap...',
     noData: 'No telemetry available for this lap.',
+    /* 2026 only: energy use guessed from speed, throttle and brake. Never shown as fact. */
+    likely: {
+      legend: 'Likely energy use, estimated',
+      liftShort: 'lift?',
+      boostShort: 'boost?',
+      straightShort: 'SM?',
+      caption: (lifts: number, boosts: number, straights: number) =>
+        `${lifts} likely lift-and-coast ${lifts === 1 ? 'point' : 'points'} (dashed lines), ${boosts} likely Boost or Overtake Mode ${boosts === 1 ? 'stretch' : 'stretches'} (boost?) and ${straights} likely Straight mode ${straights === 1 ? 'stretch' : 'stretches'} (SM?), against this driver’s fastest lap. OpenF1 publishes no energy data, so none of these is certain: a tow from the car ahead looks the same.`,
+      sameLap:
+        'This is the fastest lap, so there is nothing to compare Boost or Straight mode against: pick another lap.',
+    },
     distanceNote:
       'Distance is integrated from speed and is accurate to about 1%, so it is an estimate rather than a track position.',
   },
@@ -580,6 +591,26 @@ export const strings = {
         unavailable: 'Both drivers need a measured stint on their current tyres first.',
       },
 
+      energy: {
+        title: 'Energy story',
+        style: {
+          conserving: 'Conserving',
+          balanced: 'Balanced',
+          attacking: 'Attacking',
+        } as Record<string, string>,
+        rates: (lifts: number, boosts: number) =>
+          `${lifts} likely lifts and ${boosts} likely boosts a lap over the last 3 laps`,
+        why: {
+          conserving:
+            'Saving energy now often means an attack is being prepared for the next laps, or the battery is being kept for defending.',
+          balanced: 'Neither saving nor spending much energy: no sign yet of a planned attack.',
+          attacking:
+            'Spending energy now leaves less for the laps ahead, so this driver may be easier to pass later.',
+        } as Record<string, string>,
+        loading: 'Reading the last three laps of telemetry...',
+        unavailable: 'Telemetry for these laps could not be loaded.',
+        note: 'Estimated from speed, throttle and brake. OpenF1 publishes no energy data.',
+      },
       cheap: {
         sc: 'Safety car: cheap stop',
         vsc: 'Virtual safety car: cheap stop',

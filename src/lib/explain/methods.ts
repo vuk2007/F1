@@ -77,6 +77,15 @@ export const METHODS = {
     trust:
       'The discount is a rule of thumb, not measured. On 2025 races the predicted rejoin place was within two of the real one 71% of the time; the field keeps bunching after the call.',
   },
+  energyStory: {
+    title: 'Energy story',
+    estimates:
+      'How hard a driver is using battery energy over their last three laps, from 2026: conserving, balanced or attacking.',
+    computed:
+      'Each of the last three laps is compared with the driver’s fastest lap. A likely lift and coast is the throttle off near top speed, before braking, for at least half a second. A likely boost is 100 m or more clearly faster than the fastest lap on no more throttle. Two or more lifts a lap with little boosting reads as conserving; one or more boosts a lap with few lifts reads as attacking.',
+    trust:
+      'Always low. OpenF1 publishes nothing about Overtake Mode, Boost or battery state, and telemetry arrives about four times a second, so every marker is a guess: a tow from the car ahead looks like a boost. The thresholds are a judgement, not fitted. What it relies on is real: on the same Monza laps, 2026 cars lifted at the end of straights where 2025 cars did not.',
+  },
   practiceForecast: {
     title: 'What practice says about the race',
     estimates:

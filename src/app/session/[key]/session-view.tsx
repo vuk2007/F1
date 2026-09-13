@@ -582,6 +582,7 @@ export function SessionView({
                   predictions={predictions}
                   drivers={dataset.drivers}
                   onSelectRival={setRivalDriver}
+                  dataset={dataset}
                 />
               )}
             </>

@@ -6,7 +6,9 @@
  */
 import { strings } from '@/lib/i18n/strings';
 import type { PracticePredictions, RacePredictions } from '@/lib/models/predict/assemble';
+import type { SessionDataset } from '@/lib/openf1/dataset';
 import type { Driver } from '@/lib/openf1/types';
+import { EnergyStoryCard } from './EnergyStoryCard';
 import { BattleForecastCard, OvertakeCard } from './BattleCards';
 import { CheapStopCard } from './CheapStopCard';
 import { PitWindowCard, TyreLifeCard } from './DriverForecastCards';
@@ -18,10 +20,13 @@ export function Predictions({
   predictions,
   drivers,
   onSelectRival,
+  dataset,
 }: {
   predictions: RacePredictions | PracticePredictions;
   drivers: Driver[];
   onSelectRival: (driverNumber: number) => void;
+  /** For the 2026 energy story, which loads its own telemetry. */
+  dataset?: SessionDataset;
 }) {
   const text = strings.simple.predictions;
   const labelFor = (n: number) =>
@@ -63,6 +68,27 @@ export function Predictions({
                 totalLaps={predictions.totalLaps}
                 onSelectRival={onSelectRival}
               />
+              {predictions.regulations === 'overtake-mode' && dataset && (
+                <EnergyStoryCard
+                  dataset={dataset}
+                  drivers={[
+                    {
+                      driverNumber: predictions.driver.driverNumber,
+                      label: predictions.driver.label,
+                      lastLap: predictions.driver.lastLap,
+                    },
+                    ...(predictions.driver.rivalNumber == null
+                      ? []
+                      : [
+                          {
+                            driverNumber: predictions.driver.rivalNumber,
+                            label: labelFor(predictions.driver.rivalNumber),
+                            lastLap: predictions.driver.rivalLastLap,
+                          },
+                        ]),
+                  ]}
+                />
+              )}
             </>
           ) : (
             <p className="text-muted text-xs md:col-span-2">{text.selectDriver}</p>

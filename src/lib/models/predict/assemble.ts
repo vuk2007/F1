@@ -74,6 +74,9 @@ export interface DriverPredictions {
   rejoin: Rejoin | null;
   rivalNumber: number | null;
   strategy: StrategyBattle | null;
+  /** Last lap each has completed, for the energy story's telemetry. */
+  lastLap: number | null;
+  rivalLastLap: number | null;
 }
 
 export interface RacePredictions {
@@ -303,6 +306,12 @@ export function buildPredictions(input: {
     })),
   });
 
+  const lastCompleted = (n: number) =>
+    snapshot.laps.reduce<number | null>(
+      (max, l) => (l.driver_number === n ? Math.max(max ?? 0, l.lap_number) : max),
+      null,
+    );
+
   let driver: DriverPredictions | null = null;
   if (selectedDriver != null) {
     const fit = fitFor(selectedDriver);
@@ -360,6 +369,8 @@ export function buildPredictions(input: {
             : null,
       rejoin: rejoinIfPitNow(gaps, selectedDriver, pitLoss.seconds),
       rivalNumber,
+      lastLap: lastCompleted(selectedDriver),
+      rivalLastLap: rivalNumber == null ? null : lastCompleted(rivalNumber),
       strategy:
         me && rival ? strategyBattle(me, rival, { totalLaps, pitLoss: pitLoss.seconds }) : null,
     };

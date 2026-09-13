@@ -16,6 +16,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -41,6 +42,17 @@ const COLOUR = {
   zero: '#4b5563',
 } as const;
 
+/**
+ * Estimated energy-use markers for the speed trace (2026 only; see lib/models/energy).
+ * Drawn in the axis grey and named by their labels, never by colour: they are
+ * guesses laid over the data, not a third series.
+ */
+export interface EnergyMarkers {
+  /** Distances where a likely lift and coast began. */
+  lifts: number[];
+  areas: { from: number; to: number; label: string; strength: 'weak' | 'strong' }[];
+}
+
 interface TraceProps {
   rows: ComparisonRow[];
   keyA: keyof ComparisonRow;
@@ -54,6 +66,7 @@ interface TraceProps {
   step?: boolean;
   showZero?: boolean;
   tickFormatter?: (value: number) => string;
+  markers?: EnergyMarkers;
 }
 
 function Trace({
@@ -68,6 +81,7 @@ function Trace({
   step,
   showZero,
   tickFormatter,
+  markers,
 }: TraceProps) {
   return (
     <div style={{ height }} className="w-full">
@@ -90,6 +104,31 @@ function Trace({
             tickFormatter={tickFormatter ?? ((value: number) => String(Math.round(value)))}
           />
           {showZero && <ReferenceLine y={0} stroke={COLOUR.zero} strokeDasharray="3 3" />}
+          {markers?.areas.map((area) => (
+            <ReferenceArea
+              key={`${area.label}-${area.from}`}
+              x1={area.from}
+              x2={area.to}
+              fill={COLOUR.axis}
+              fillOpacity={area.strength === 'strong' ? 0.18 : 0.08}
+              stroke="none"
+              label={{ value: area.label, position: 'insideTop', fill: COLOUR.axis, fontSize: 9 }}
+            />
+          ))}
+          {markers?.lifts.map((distance) => (
+            <ReferenceLine
+              key={`lift-${distance}`}
+              x={distance}
+              stroke={COLOUR.axis}
+              strokeDasharray="4 3"
+              label={{
+                value: strings.telemetry.likely.liftShort,
+                position: 'top',
+                fill: COLOUR.axis,
+                fontSize: 9,
+              }}
+            />
+          ))}
           <Tooltip
             contentStyle={{
               background: '#1b2027',
@@ -148,10 +187,13 @@ export function TelemetryChart({
   rows,
   labelA,
   labelB,
+  markers,
 }: {
   rows: ComparisonRow[];
   labelA: string;
   labelB: string | null;
+  /** 2026 sessions only. */
+  markers?: EnergyMarkers;
 }) {
   if (rows.length === 0) {
     return <p className="text-muted py-4 text-sm">{strings.telemetry.noData}</p>;
@@ -184,6 +226,7 @@ export function TelemetryChart({
         labelB={labelB ?? undefined}
         height={150}
         unit=" km/h"
+        markers={markers}
       />
 
       {comparing && (

@@ -11,7 +11,9 @@ import { memo, useMemo, useState } from 'react';
 import { formatLapTime } from '@/lib/format';
 import { strings } from '@/lib/i18n/strings';
 import { telemetryCaption } from '@/lib/explain/captions';
+import { boostCandidate, harvestLift, straightModeSegments } from '@/lib/models/energy';
 import { buildComparison, fullThrottleShare, topSpeed } from '@/lib/models/telemetry';
+import { regulationsFor } from '@/lib/season';
 import type { SessionDataset } from '@/lib/openf1/dataset';
 import type { Driver } from '@/lib/openf1/types';
 import { useLapLocation, useTelemetry } from '@/lib/replay/use-telemetry';
@@ -64,6 +66,47 @@ function TelemetryPanelInner({
   const primary = useTelemetry(dataset, driver.driver_number, lapNumber);
   const secondary = useTelemetry(dataset, compareWith, lapNumber);
   const location = useLapLocation(dataset, driver.driver_number, lapNumber);
+
+  /*
+   * 2026 only: likely energy-use markers. A lift needs only this lap; Boost and
+   * Straight mode compare with a reference, the driver's fastest lap, which is
+   * fetched only when a different lap is on screen. Seasons with DRS are unchanged.
+   */
+  const energyOn = regulationsFor(dataset.session.year) === 'overtake-mode';
+  const reference = useTelemetry(
+    dataset,
+    driver.driver_number,
+    energyOn && defaultLap !== lapNumber ? defaultLap : null,
+  );
+  const energy = useMemo(() => {
+    if (!energyOn || primary.points.length === 0) return null;
+    const likely = strings.telemetry.likely;
+    const lifts = harvestLift(primary.points).map((lift) => lift.startDistance);
+    const hasReference = reference.points.length > 0;
+    const boosts = hasReference ? boostCandidate(primary.points, reference.points) : [];
+    const straights = hasReference ? straightModeSegments(primary.points, reference.points) : [];
+    return {
+      markers: {
+        lifts,
+        areas: [
+          ...straights.map((s) => ({
+            from: s.fromDistance,
+            to: s.toDistance,
+            label: likely.straightShort,
+            strength: 'weak' as const,
+          })),
+          ...boosts.map((s) => ({
+            from: s.fromDistance,
+            to: s.toDistance,
+            label: likely.boostShort,
+            strength: 'strong' as const,
+          })),
+        ],
+      },
+      caption: likely.caption(lifts.length, boosts.length, straights.length),
+      isFastestLap: defaultLap === lapNumber,
+    };
+  }, [energyOn, primary.points, reference.points, defaultLap, lapNumber]);
 
   const rows = useMemo(
     () => buildComparison(primary.points, compareWith == null ? null : secondary.points),
@@ -168,6 +211,7 @@ function TelemetryPanelInner({
                 rows={rows}
                 labelA={driver.name_acronym}
                 labelB={compareDriver && !secondary.loading ? compareDriver.name_acronym : null}
+                markers={energy?.markers}
               />
             </div>
             <div className="w-full xl:w-[340px] xl:shrink-0">
@@ -179,6 +223,14 @@ function TelemetryPanelInner({
             </div>
           </div>
           {caption && <p className="text-foreground/80 mt-2 text-xs leading-relaxed">{caption}</p>}
+          {energy && (
+            <p className="text-muted mt-2 text-xs leading-relaxed">
+              <span className="text-foreground/80 font-medium">
+                {strings.telemetry.likely.legend}:{' '}
+              </span>
+              {energy.isFastestLap ? strings.telemetry.likely.sameLap : energy.caption}
+            </p>
+          )}
         </>
       )}
     </section>
