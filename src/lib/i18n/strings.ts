@@ -467,6 +467,11 @@ export const strings = {
           body: 'Tap any card to see that driver’s race in detail. Every (i) explains the number next to it.',
         },
       ],
+      /* Shown only for 2026 sessions, before the last step: the three driver tools. */
+      toolsStep: {
+        heading: 'Three tools for attacking',
+        body: 'Overtake Mode gives extra battery energy to a car within one second of the one ahead. Boost Mode is maximum power on demand, to attack or to defend. Active Aero flattens the wings on the straights for every car.',
+      },
       next: 'Next',
       back: 'Back',
       done: 'Got it',

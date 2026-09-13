@@ -9,9 +9,14 @@
  */
 import { useEffect, useState } from 'react';
 import { strings } from '@/lib/i18n/strings';
+import type { Regulations } from '@/lib/season';
 import { useViewPrefs } from '@/lib/store/view-prefs';
 
-export function Onboarding() {
+/**
+ * `regulations` adds a step for 2026 sessions: DRS is gone, and a newcomer needs the
+ * three tools that replaced it before "Tap a driver" sends them into the detail.
+ */
+export function Onboarding({ regulations = 'drs' }: { regulations?: Regulations }) {
   const requested = useViewPrefs((s) => s.onboardingOpen);
   const seen = useViewPrefs((s) => s.onboardingSeen);
   const closeOnboarding = useViewPrefs((s) => s.closeOnboarding);
@@ -19,7 +24,10 @@ export function Onboarding() {
 
   const open = requested || !seen;
   const text = strings.simple.onboarding;
-  const steps = text.steps;
+  const steps =
+    regulations === 'overtake-mode'
+      ? [...text.steps.slice(0, -1), text.toolsStep, ...text.steps.slice(-1)]
+      : text.steps;
   const current = steps[step]!;
   const last = step === steps.length - 1;
 

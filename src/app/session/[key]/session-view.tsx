@@ -651,7 +651,7 @@ export function SessionView({
         </aside>
       </div>
 
-      {simple && <Onboarding />}
+      {simple && <Onboarding regulations={regulationsFor(session.year)} />}
     </main>
   );
 }

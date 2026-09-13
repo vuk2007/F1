@@ -64,6 +64,22 @@ export function recordingName(sessionInfo: unknown): string {
   return parts.join('-');
 }
 
+/**
+ * The recording a session change should move to, or null to keep the current one.
+ *
+ * The feed keeps announcing the last session for hours after it ends — the bridge
+ * started at 10:11 on race day still saw Saturday's qualifying — and switches to
+ * the race while the socket stays open. Without this the race is appended to the
+ * qualifying file, behind a snapshot that belongs to qualifying. An idle feed with
+ * no SessionInfo never moves an existing recording.
+ */
+export function nextRecordingName(currentPath: string | null, sessionInfo: unknown): string | null {
+  const name = recordingName(sessionInfo);
+  if (name.startsWith('idle-') && currentPath != null) return null;
+  if (currentPath != null && path.basename(currentPath, '.jsonl') === name) return null;
+  return name;
+}
+
 export class Recorder {
   #stream: fs.WriteStream;
   #nextId = 0;

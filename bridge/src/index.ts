@@ -10,7 +10,7 @@
  */
 import { openFeed, type FeedMessage } from './signalr.ts';
 import { FeedState } from '../../src/lib/live/feed-state.ts';
-import { Recorder, recordingName } from './recorder.ts';
+import { Recorder, nextRecordingName, recordingName } from './recorder.ts';
 import { BridgeServer } from './server.ts';
 import { TOPICS } from './topics.ts';
 import { config } from './config.ts';
@@ -41,6 +41,20 @@ const MIN_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 let backoff = MIN_BACKOFF_MS;
 
+/**
+ * Starts a new recording when the feed moves to a new session, opening it with the
+ * merged state so it replays on its own. See `nextRecordingName`.
+ */
+function followSession(): void {
+  const name = nextRecordingName(recorder?.path ?? null, state.get('SessionInfo'));
+  if (name == null) return;
+  const previous = recorder;
+  recorder = new Recorder(config.recordingsDir, name);
+  recorder.write({ type: 'snapshot', data: state.all() });
+  log(`session changed — recording to ${recorder.path}`);
+  void previous?.close();
+}
+
 function onMessage(message: FeedMessage): void {
   const merged = state.apply(message.topic, message.data);
   recorder?.write({
@@ -49,6 +63,7 @@ function onMessage(message: FeedMessage): void {
     data: message.data,
     timestamp: message.timestamp,
   });
+  if (message.topic === 'SessionInfo') followSession();
   server.broadcastDelta(message.topic, merged);
 }
 
@@ -82,8 +97,13 @@ async function connect(): Promise<void> {
     if (!recorder) {
       recorder = new Recorder(config.recordingsDir, recordingName(feed.snapshot.SessionInfo));
       log(`recording to ${recorder.path}`);
+      recorder.write({ type: 'snapshot', data: feed.snapshot });
+    } else if (nextRecordingName(recorder.path, feed.snapshot.SessionInfo) != null) {
+      // Reconnected into a different session: start its own file.
+      followSession();
+    } else {
+      recorder.write({ type: 'snapshot', data: feed.snapshot });
     }
-    recorder.write({ type: 'snapshot', data: feed.snapshot });
 
     feedConnected = true;
     server.broadcastSnapshot();
